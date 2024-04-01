@@ -108,10 +108,37 @@ To open a file, use the `fs_open` function. This function prepares a file for re
 
 #### Syntax
 
-```c
-FS_FILE* fs_open(const char* path, const char* mode);
-```
+    +++c
+    FS_FILE* fs_open(const char* path, const char* mode);
 
+    Parameters
+
+        path: The path or name of the file to be opened.
+        mode: A string that specifies the access mode for the file. The mode can be:
+            "r": Open the file for reading. The file must exist.
+            "w": Open the file for writing. If the file exists, it will be truncated to zero length. If the file does not exist, it will be created.
+            "a": Open the file for appending. Data will be added to the end of the file. If the file does not exist, it will be created.
+
+    Return Value
+
+    Returns a pointer to an FS_FILE structure representing the opened file. If the file cannot be opened, it returns NULL.
+    Example
+
+    +++c
+
+    FS_FILE* file = fs_open("example.txt", "w");
+    if (file == NULL) {
+        // Handle error
+    }
+
+    +++vbnet
+
+
+This section provides clear guidance on how to open files using your filesystem's API, including the syntax, parameters involved, the expected return value, and a practical example of usage.
+
+
+
+ 
 
 
 ### Writing to a File
@@ -140,5 +167,41 @@ FS_FILE* fs_open(const char* path, const char* mode);
  
 
 ## Acknowledgments
+
+### Opening a File
+
+To open a file, use the `fs_open` function. This function prepares a file for reading, writing, or appending based on the mode specified.
+
+#### Syntax
+
+    +++c
+    FS_FILE* fs_open(const char* path, const char* mode);
+
+    Parameters
+
+        path: The path or name of the file to be opened.
+        mode: A string that specifies the access mode for the file. The mode can be:
+            "r": Open the file for reading. The file must exist.
+            "w": Open the file for writing. If the file exists, it will be truncated to zero length. If the file does not exist, it will be created.
+            "a": Open the file for appending. Data will be added to the end of the file. If the file does not exist, it will be created.
+
+    Return Value
+
+    Returns a pointer to an FS_FILE structure representing the opened file. If the file cannot be opened, it returns NULL.
+    Example
+
+    +++c
+
+    FS_FILE* file = fs_open("example.txt", "w");
+    if (file == NULL) {
+        // Handle error
+    }
+
+    +++vbnet
+
+
+This section provides clear guidance on how to open files using your filesystem's API, including the syntax, parameters involved, the expected return value, and a practical example of usage.
+
+
 
  
