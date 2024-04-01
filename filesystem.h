@@ -6,19 +6,34 @@
 #include <stdbool.h>
 
 #define MAX_FILES 10  // Maximum number of files in the filesystem
+#define MAX_FILE_SIZE 1024
+
+typedef enum {
+    MODE_READ = 1, // Read mode
+    MODE_WRITE,    // Write mode
+    MODE_APPEND    // Append mode
+} FileMode;
+
 
 // File entry structure
 typedef struct {
     char filename[256];     // Path of the file
     uint32_t size;      // Size of the file
     bool in_use;        // Indicates if this file entry is in use
+    uint8_t data[MAX_FILE_SIZE]; // Pre-allocated space for file data
 } FileEntry;
 
 // File handle structure
 typedef struct {
     FileEntry *entry;   // Pointer to the file entry in the file system
     uint32_t position;  // Current position in the file
+    FileMode mode; 
 } FS_FILE;
+
+ 
+
+
+
 
 FS_FILE* fs_open(const char* path, const char* mode);
 void fs_close(FS_FILE* file);
@@ -33,3 +48,6 @@ int fs_seek(FS_FILE* file, long offset, int whence);
 //int fs_rm(const char* path);
 
 #endif // FILESYSTEM_H
+
+
+

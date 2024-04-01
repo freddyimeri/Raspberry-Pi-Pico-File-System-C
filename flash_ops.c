@@ -93,3 +93,4 @@ void flash_erase_safe(uint32_t offset) {
     // Restore interrupts
     restore_interrupts(ints);
 }
+

@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "flash_ops.h": "c",
+        "gpio.h": "c",
+        "string.h": "c",
+        "stdlib.h": "c"
+    }
+}
