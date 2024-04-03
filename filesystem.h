@@ -21,6 +21,7 @@ typedef struct {
     uint32_t size;      // Size of the file
     bool in_use;        // Indicates if this file entry is in use
     uint32_t start_block; // Offset in flash memory where the file data starts
+    bool is_directory;      // Flag to indicate if this entry is a
 } FileEntry;
 
 // File handle structure
@@ -30,6 +31,12 @@ typedef struct {
     FileMode mode; 
 } FS_FILE;
 
+typedef struct {
+    char name[256];       // Name of the file or directory
+    bool is_directory;    // Flag to indicate if this is a directory
+    uint32_t size;        // Size (for files) or number of entries (for directories)
+    uint32_t start_block; // Start block in flash memory
+} DirectoryEntry;
 
 
 FS_FILE* fs_open(const char* path, const char* mode);
@@ -38,11 +45,14 @@ int fs_read(FS_FILE* file, void* buffer, int size);
 int fs_write(FS_FILE* file, const void* buffer, int size);
 int fs_seek(FS_FILE* file, long offset, int whence);
 void fs_init(void);
+bool fs_create_directory(const char* path);
+int fs_mv(const char* old_path, const char* new_path);
 
-//int fs_format(const char* path);
+
+
 //int fs_wipe(const char* path);
-//int fs_mv(const char* old_path, const char* new_path);
-//int fs_cp(const char* source_path, const char* dest_path);
+ 
+ 
 //int fs_rm(const char* path);
 
 #endif // FILESYSTEM_H

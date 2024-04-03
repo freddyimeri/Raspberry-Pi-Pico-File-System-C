@@ -17,7 +17,7 @@
 #define NO_SIZE 0xFFFFFFFF
 
 typedef uint32_t FAT_Entry;
-
+  
 // Function declarations
 void fat_init(void);
 uint32_t fat_allocate_block(void);

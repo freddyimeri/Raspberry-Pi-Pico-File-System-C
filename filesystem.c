@@ -7,7 +7,6 @@
 #include "hardware/sync.h"
 #include "hardware/flash.h"
 #include "fat_fs.h"
-
 #include "flash_config.h"
 
 
@@ -44,6 +43,27 @@ void fs_init() {
     }
 }
 
+bool fs_create_directory(const char* path) {
+    // Find a free entry in the filesystem for the new directory
+    for (int i = 0; i < MAX_FILES; i++) {
+        if (!fileSystem[i].in_use) {
+            strncpy(fileSystem[i].filename, path, sizeof(fileSystem[i].filename) - 1);
+            fileSystem[i].filename[sizeof(fileSystem[i].filename) - 1] = '\0';
+            fileSystem[i].is_directory = true;
+            fileSystem[i].size = 0; // Initially, no entries in the directory
+            fileSystem[i].in_use = true;
+            fileSystem[i].start_block = fat_allocate_block(); // Allocate a block for directory entries
+            if (fileSystem[i].start_block == FAT_ENTRY_FULL) {
+                printf("Error: No space left on device to create new directory.\n");
+                fileSystem[i].in_use = false; // Reset the entry as allocation failed
+                return false;
+            }
+            return true;
+        }
+    }
+    printf("Error: Filesystem is full, cannot create new directory.\n");
+    return false;
+}
 
 
 FileEntry* find_file_by_path(const char* path) {
@@ -333,4 +353,40 @@ int fs_seek(FS_FILE* file, long offset, int whence) {
     // Set the file's current position to the new position
     file->position = new_position;
     return 0; // Seek operation successful
+}
+
+
+////////////////////////////////////// 
+ 
+int fs_mv(const char* old_path, const char* new_path) {
+    // Check for NULL paths
+    if (!old_path || !new_path) {
+        return -1; // Invalid arguments
+    }
+    
+    // Check if new_path already exists
+    for (int i = 0; i < MAX_FILES; i++) {
+        if (fileSystem[i].in_use && strcmp(fileSystem[i].filename, new_path) == 0) {
+            return -2; // New path conflicts with an existing file
+        }
+    }
+
+    // Find the file with old_path
+    int fileIndex = -1;
+    for (int i = 0; i < MAX_FILES; i++) {
+        if (fileSystem[i].in_use && strcmp(fileSystem[i].filename, old_path) == 0) {
+            fileIndex = i;
+            break;
+        }
+    }
+
+    if (fileIndex == -1) {
+        return -3; // File not found
+    }
+
+    // Update the file's path
+    strncpy(fileSystem[fileIndex].filename, new_path, sizeof(fileSystem[fileIndex].filename));
+    fileSystem[fileIndex].filename[sizeof(fileSystem[fileIndex].filename) - 1] = '\0'; // Ensure null-termination
+
+    return 0; // Success
 }
