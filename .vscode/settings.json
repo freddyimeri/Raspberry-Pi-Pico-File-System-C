@@ -7,6 +7,8 @@
         "filesystem.h": "c",
         "stdio.h": "c",
         "stddef.h": "c",
-        "stdbool.h": "c"
+        "stdbool.h": "c",
+        "flash_config.h": "c",
+        "flash.h": "c"
     }
 }

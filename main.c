@@ -70,9 +70,9 @@ int main() {
     fs_close(myFile);
     sleep_ms(1000);
     printf("'test.txt' closed after reading.\n");
-    fflush(stdout);
     printf("Filesystem Test Complete\n");
     fflush(stdout);
+   
     printf("BYE\n");
     fflush(stdout);
     return 0;

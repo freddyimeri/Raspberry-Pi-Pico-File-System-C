@@ -4,15 +4,13 @@
 #include "pico/stdlib.h"
 #include "hardware/flash.h"
 #include "hardware/sync.h"
-
-#define FLASH_TARGET_OFFSET (256 * 1024) // Offset where user data starts (256KB into flash)
-#define FLASH_SIZE PICO_FLASH_SIZE_BYTES // Total flash size available
+#include "flash_config.h"
 
 
 void flash_write_safe_struct(uint32_t offset, flash_data_t *new_data) {
     uint32_t flash_offset = FLASH_TARGET_OFFSET + offset;
     // Ensure we don't exceed flash memory limits
-    if (flash_offset + sizeof(flash_data_t) > FLASH_TARGET_OFFSET + FLASH_SIZE) {
+    if (flash_offset + sizeof(flash_data_t) > FLASH_TARGET_OFFSET + FLASH_MEMORY_SIZE_BYTES) {
         printf("Error: Attempt to write beyond flash memory limits.\n");
         return;
     }
@@ -35,7 +33,7 @@ void flash_read_safe_struct(uint32_t offset, flash_data_t *data) {
     uint32_t flash_offset = FLASH_TARGET_OFFSET + offset;
 
     // Bounds checking
-    if (flash_offset + sizeof(flash_data_t) > FLASH_TARGET_OFFSET + FLASH_SIZE) {
+    if (flash_offset + sizeof(flash_data_t) > FLASH_TARGET_OFFSET + FLASH_MEMORY_SIZE_BYTES) {
         printf("Error: Attempt to read beyond flash memory limits.\n");
         return;
     }
@@ -66,7 +64,7 @@ void flash_erase_safe(uint32_t offset) {
     uint32_t flash_offset = FLASH_TARGET_OFFSET + offset;
     uint32_t ints = save_and_disable_interrupts();
     uint32_t sector_start = flash_offset & ~(FLASH_SECTOR_SIZE - 1);
-    if (sector_start < FLASH_TARGET_OFFSET + FLASH_SIZE) {
+    if (sector_start < FLASH_TARGET_OFFSET + FLASH_MEMORY_SIZE_BYTES) {
     	flash_range_erase(sector_start, FLASH_SECTOR_SIZE);
     } 
     else 

@@ -8,13 +8,7 @@
 #include "hardware/flash.h"
 #include "fat_fs.h"
 
-#define FLASH_SIZE PICO_FLASH_SIZE_BYTES 
-#define FLASH_TARGET_OFFSET (256 * 1024)
-#define FLASH_METADATA_SPACE (256 * 1024)  // Space reserved for metadata and wear leveling
-#define FLASH_USABLE_SPACE (PICO_FLASH_SIZE_BYTES - FLASH_METADATA_SPACE) // Usable space for files
-#define MAX_FILES 10 // Maximum number of files
-// Calculate the maximum file size aligned to the flash sector size
-#define MAX_FILE_SIZE ((FLASH_USABLE_SPACE / MAX_FILES) & ~(FLASH_SECTOR_SIZE - 1))
+#include "flash_config.h"
 
 
 FileEntry fileSystem[MAX_FILES];

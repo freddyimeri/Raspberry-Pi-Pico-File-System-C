@@ -4,8 +4,9 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "flash_config.h"
 
-#define MAX_FILES 10  // Maximum number of files in the filesystem
+// #define MAX_FILES 10  // Maximum number of files in the filesystem
 
 
 typedef enum {
