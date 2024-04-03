@@ -3,10 +3,34 @@
 #include <string.h> 
 #include <stdlib.h> // For free()
 #include "flash_ops.h"
+#include "pico/stdlib.h" // Include Pico SDK stdlib
+#include "hardware/sync.h"
+#include "hardware/flash.h"
+ 
 
 
-#define USER_DATA_SIZE (2 * 1024 * 1024 - 256 * 1024) // Calculate usable space for files
-#define MAX_FILE_SIZE (USER_DATA_SIZE / MAX_FILES)
+
+
+#define FLASH_SIZE PICO_FLASH_SIZE_BYTES 
+#define FLASH_TARGET_OFFSET (256 * 1024)
+// No need to define FLASH_TOTAL_SIZE as it is provided by PICO_FLASH_SIZE_BYTES
+
+#define FLASH_METADATA_SPACE (256 * 1024)  // Space reserved for metadata and wear leveling
+#define FLASH_USABLE_SPACE (PICO_FLASH_SIZE_BYTES - FLASH_METADATA_SPACE) // Usable space for files
+
+
+#define MAX_FILES 10 // Maximum number of files
+
+// Calculate the maximum file size aligned to the flash sector size
+#define MAX_FILE_SIZE ((FLASH_USABLE_SPACE / MAX_FILES) & ~(FLASH_SECTOR_SIZE - 1))
+
+
+
+
+
+
+
+
 
 
 
@@ -19,10 +43,34 @@ FileEntry fileSystem[MAX_FILES];
  * It sets all file entries to not in use, preparing the file system for operation.
  */
 void fs_init() {
+    // Assume FLASH_TARGET_OFFSET is where your file system starts in flash memory
+    // Assume FLASH_SECTOR_SIZE is the size of each sector
+    // Define MAX_FILE_SIZE as the max size for each file which should be equal or less than FLASH_SECTOR_SIZE
+    // and aligned to the sector boundary if FLASH_SECTOR_SIZE is not a multiple of MAX_FILE_SIZE.
+
+    uint32_t current_flash_address = FLASH_TARGET_OFFSET;
+
     for (int i = 0; i < MAX_FILES; i++) {
-        fileSystem[i].in_use = false; // Initially, no file is in use
+        fileSystem[i].in_use = false;  // Initially, no file is in use
+        fileSystem[i].size = 0;        // Initialize the file size to 0
+
+        // Initialize the flash address for each file entry
+        fileSystem[i].flash_address = current_flash_address;
+
+        // Move the current flash address to the start of the next sector
+        // making sure each file starts at the beginning of a new sector
+        current_flash_address += MAX_FILE_SIZE;
+
+        // Check if the new flash address exceeds the flash size, wrap around, or handle as error
+        if (current_flash_address >= FLASH_TARGET_OFFSET + FLASH_USABLE_SPACE) {
+            // Handle the case where we've exceeded the flash space
+            // This could be an error, or you might want to wrap around
+            printf("Error: Not enough flash memory for the number of files.\n");
+            return;
+        }
     }
 }
+
 
 
 FileEntry* find_file_by_path(const char* path) {
@@ -43,51 +91,67 @@ FileEntry* find_file_by_path(const char* path) {
  * @return A pointer to the opened file, or NULL if an error occurred.
  */
 FS_FILE* fs_open(const char* path, const char* mode) {
+    // Check if the input path and mode are valid
+    if (path == NULL || mode == NULL) {
+        printf("Error: Path or mode is NULL.\n");
+        return NULL;
+    }
+
+    // Attempt to find the file entry in the file system
     FileEntry* entry = find_file_by_path(path);
 
+    // Handle opening in read mode
     if (strcmp(mode, "r") == 0) {
-        // For read mode, the file must exist
+        // The file must exist for read mode
         if (entry == NULL) {
             printf("Error: File not found for reading.\n");
             return NULL;
         }
-    } else if (strcmp(mode, "w") == 0) {
-        // For write mode, create the file if it does not exist
+    } else if (strcmp(mode, "w") == 0 || strcmp(mode, "a") == 0) {
+        // For write or append mode, create a new file if it does not exist
         if (entry == NULL) {
+            // Find a free slot for the new file
             for (int i = 0; i < MAX_FILES; i++) {
                 if (!fileSystem[i].in_use) {
-                    // Found a free slot, use it for the new file
                     entry = &fileSystem[i];
+                    // Initialize the new file entry
                     strncpy(entry->filename, path, sizeof(entry->filename) - 1);
-                    entry->filename[sizeof(entry->filename) - 1] = '\0'; // Ensure null termination
-                    entry->size = 0; // New file, size is 0
-                    entry->in_use = true;
+                    entry->filename[sizeof(entry->filename) - 1] = '\0'; // Null-terminate the string
+                    entry->size = 0; // Set the file size to 0
+                    entry->in_use = true; // Mark the file as in use
+                    // TODO: Assign entry->flash_address based on your flash memory layout
+                    // entry->flash_address = calculate_flash_address_for_file(i);
                     break;
                 }
             }
-        }
-        if (entry == NULL) {
-            printf("Error: Filesystem is full, cannot create new file.\n");
-            return NULL;
+            if (entry == NULL) {
+                printf("Error: Filesystem is full, cannot create new file.\n");
+                return NULL;
+            }
+        } else if (strcmp(mode, "w") == 0) {
+            // If opening an existing file in write mode, erase its content
+            // Erase the file's allocated flash memory before writing new content
+            // This is an important step as flash memory must be erased before being rewritten
+            flash_erase_safe(entry->flash_address);
+            entry->size = 0; // Reset the file size as the content is erased
         }
     } else {
-        // This block handles unsupported modes. It's good practice to handle this explicitly.
+        // Unsupported mode
         printf("Error: Unsupported file mode '%s'.\n", mode);
         return NULL;
     }
 
-    // Allocate a new FS_FILE structure for the opened file
+    // Allocate and initialize a new FS_FILE structure for the opened file
     FS_FILE* file = (FS_FILE*)malloc(sizeof(FS_FILE));
-    if (!file) {
+    if (file == NULL) {
         printf("Error: Memory allocation failed for FS_FILE.\n");
         return NULL;
     }
 
-    // Initialize the FS_FILE structure
+    // Initialize the FS_FILE structure fields
     file->entry = entry;
-    file->position = 0; // Start at the beginning of the file
-
-    // Set the mode for the file based on the input parameter
+    file->position = (strcmp(mode, "a") == 0) ? entry->size : 0; // If appending, set position to the end of the file
+    // Set the mode of the file based on the input parameter
     if (strcmp(mode, "r") == 0) {
         file->mode = MODE_READ;
     } else if (strcmp(mode, "w") == 0) {
@@ -95,10 +159,10 @@ FS_FILE* fs_open(const char* path, const char* mode) {
     } else if (strcmp(mode, "a") == 0) {
         file->mode = MODE_APPEND;
     }
-    // The earlier else block remains to handle unsupported modes
 
     return file;
 }
+
 
 /**
  * Closes the specified file.
@@ -146,39 +210,41 @@ void fs_close(FS_FILE* file) {
  * @return The number of bytes actually read, or -1 if an error occurred.
  */
 int fs_read(FS_FILE* file, void* buffer, int size) {
-    // Validate the input parameters to ensure they are not NULL and the request is valid
+    // Validate input parameters
     if (file == NULL || buffer == NULL || size < 0) {
-        printf("Error: Invalid input parameters for fs_read.\n");
+        printf("Error: Invalid parameters for fs_read.\n");
         return -1;
     }
 
-    // Ensure the file is opened in a mode that allows reading
-    if (file->mode != MODE_READ && file->mode != MODE_APPEND) { // Append mode may also allow reading
-        printf("Error: File is not in a readable mode.\n");
+    // Check if the file is opened in a mode that allows reading
+    if (file->mode != MODE_READ && file->mode != MODE_APPEND) {
+        printf("Error: File is not open in a readable mode.\n");
         return -1;
     }
 
     // Calculate the actual number of bytes to read
-    // It should not exceed the size of the file from the current position
-    int bytesToRead = size;
-    if (file->position + size > file->entry->size) {
+    // Should not read beyond the end of the file
+    int bytesToRead = file->position + size > file->entry->size ? file->entry->size - file->position : size;
+    
+    // If attempting to read more bytes than available, adjust the count
+    if (bytesToRead > file->entry->size - file->position) {
         bytesToRead = file->entry->size - file->position;
     }
-
-    // If there's nothing to read, return 0
+    
+    // Check if there's anything to read
     if (bytesToRead <= 0) {
-        return 0;
+        return 0;  // No more data left to read
     }
 
-    // Perform the actual read operation
-    memcpy(buffer, file->entry->data + file->position, bytesToRead);
+    // Use flash_read_safe to read from flash memory into the buffer
+    flash_read_safe(file->entry->flash_address + file->position, buffer, bytesToRead);
 
-    // Update the current position in the file
+    // Update the file's current read position
     file->position += bytesToRead;
 
-    // Return the number of bytes read
-    return bytesToRead;
+    return bytesToRead;  // Return the number of bytes read
 }
+
 
 /**
  * Writes data from the provided buffer to the specified file.
@@ -196,38 +262,69 @@ int fs_read(FS_FILE* file, void* buffer, int size) {
  * @return The number of bytes written, or -1 if an error occurred.
  */
 int fs_write(FS_FILE* file, const void* buffer, int size) {
+    printf("Debug: Entering fs_write.\n"); // Entering the function
     // Validate the input parameters
     if (file == NULL || buffer == NULL) {
         printf("Error: Invalid file or buffer pointer.\n");
         return -1;
     }
+    printf("Debug: Parameters validated.\n");
 
     // Check if the file is in write mode
-    if (file->mode != MODE_WRITE) {
-        printf("Error: File is not in write mode.\n");
+    if (file->mode != MODE_WRITE && file->mode != MODE_APPEND) {
+        printf("Error: File is not in write or append mode.\n");
         return -1;
     }
-
+    printf("Debug: File mode checked and is valid.\n");
+    // Check if the write size is within the bounds of the file system
+    if (size < 0 || size > MAX_FILE_SIZE) {
+        printf("Error: Write size is out of bounds.\n");
+        return -1;
+    }
+    printf("Debug: Write size is within bounds.\n"); // Size is valid
     // Calculate the write position and ensure it doesn't exceed the file system limits
-    uint32_t writePosition = file->entry->size;
-    if (writePosition + size > MAX_FILE_SIZE) { // Assuming MAX_FILE_SIZE is defined as the max file size
+    uint32_t writePosition = (file->mode == MODE_APPEND) ? file->entry->size : file->position;
+    printf("Debug: Calculated write position: %u\n", writePosition); // Write position calculated
+
+    if (writePosition + size > MAX_FILE_SIZE) {
         printf("Error: Write exceeds maximum file size.\n");
         return -1;
     }
+    printf("Debug: Write does not exceed maximum file size.\n"); // File size check passed
+    // Flash memory must be erased before writing
+    uint32_t sectorStart = writePosition + file->entry->flash_address;
+    uint32_t sectorEnd = sectorStart + size;
+    printf("Debug: Sector start: %u, Sector end: %u\n", sectorStart, sectorEnd); // Sector start and end calculated
+    // Loop through sectors to erase and write data
+    while (sectorStart < sectorEnd) {
+        // Calculate the start of the sector by aligning the address
+        uint32_t sectorBase = sectorStart & ~(FLASH_SECTOR_SIZE - 1);
+        printf("Debug: Sector base: %u\n", sectorBase); // Sector base calculated
+        // Erase the flash sector
+        flash_erase_safe(sectorBase);
+        printf("Debug: Sector erased: %u\n", sectorBase); // Sector erased
+        // Determine the amount of data to write in this sector
+        int writeLength = FLASH_SECTOR_SIZE - (sectorStart - sectorBase);
+        if (writeLength > (sectorEnd - sectorStart)) {
+            writeLength = sectorEnd - sectorStart;
+        }
+        printf("Debug: Calculated write length: %d\n", writeLength); // Write length calculated
+        printf("Debug: sectorStart IS: %d\n", sectorStart); // Write length calculated
 
-    // Perform the write operation to the simulated flash memory
-    // For a real implementation, you would call flash_write_safe from flash_ops.h
-    // This example directly manipulates the simulated flash memory for illustration
-    memcpy((void *)(file->entry->data + writePosition), buffer, size);
-
-    // Update the file's size if the write operation extends it
-    if (writePosition + size > file->entry->size) {
-        file->entry->size = writePosition + size;
+        // Write data to flash
+        flash_write_safe(sectorStart, buffer, writeLength);
+        printf("Debug: Data written. Sector start: %u, Length: %d\n", sectorStart, writeLength); // Data written
+        // Move to the next sector
+        sectorStart += writeLength;
+        printf("Debug: Sector start updated: %u\n", sectorStart); // Sector start updated
+        buffer += writeLength;
     }
 
-    // Update the file position
+    // Update the file's size and current position
+    file->entry->size = writePosition + size;
     file->position += size;
-
+    printf("Debug: File size and position updated. Size: %u, Position: %u\n", file->entry->size, file->position); // File size and position updated
+    printf("Debug: Exiting fs_write. Bytes written: %d\n", size); // Exiting function
     return size; // Return the number of bytes written
 }
 

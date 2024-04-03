@@ -6,52 +6,73 @@
 #include "hardware/gpio.h"
  
  
-// Prototype for the fs_init function if it's not declared in filesystem.h
-void fs_init(void);
 
 int main() {
+    // Initialize stdio for output
+    stdio_init_all();
+    sleep_ms(2000);
+    int i;
+
+    for(i = 20; i >= 1; i--) {
+        printf("Operation starts in: %d\n", i);
+        sleep_ms(1200);
+    }
+
+    
+ 
+    // Wait a bit for stdio to initialize
+    sleep_ms(2000);
+    printf("\nFilesystem Test Start\n");
+
     // Initialize the filesystem
     fs_init();
+    printf("Filesystem initialized.\n");
 
-    // Test opening a new file for writing
-    FS_FILE* file = fs_open("testfile.txt", "w");
-    if (file == NULL) {
-        printf("Failed to open file for writing.\n");
+    // Opening a file for writing
+    FS_FILE* myFile = fs_open("test.txt", "w");
+    if (myFile == NULL) {
+        printf("Failed to open 'test.txt' for writing.\n");
         return -1;
     }
-    printf("Opened 'testfile.txt' for writing.\n");
+    printf("'test.txt' opened for writing.\n");
 
-    // Test writing data to the file
-    const char* data = "Hello, filesystem!";
-    int bytesWritten = fs_write(file, data, strlen(data));
+    // Writing data to the file
+    char data[] = "Hello, Pico filesystem!";
+    int bytesWritten = fs_write(myFile, data, sizeof(data));
     if (bytesWritten < 0) {
-        printf("Failed to write data to file.\n");
-        fs_close(file);
+        printf("Failed to write data to 'test.txt'.\n");
+        fs_close(myFile);
         return -1;
     }
-    printf("Wrote %d bytes to 'testfile.txt'.\n", bytesWritten);
+    printf("Written %d bytes to 'test.txt'.\n", bytesWritten);
 
-    // Test seeking to the beginning of the file
-    if (fs_seek(file, 0, SEEK_SET) != 0) {
-        printf("Failed to seek to the beginning of the file.\n");
-        fs_close(file);
+    // Closing the file
+    fs_close(myFile);
+    printf("'test.txt' closed after writing.\n");
+
+    // Re-opening the file for reading
+    myFile = fs_open("test.txt", "r");
+    if (myFile == NULL) {
+        printf("Failed to open 'test.txt' for reading.\n");
         return -1;
     }
-    printf("Seeked to the beginning of 'testfile.txt'.\n");
+    printf("'test.txt' opened for reading.\n");
 
-    // Test reading back the data
-    char buffer[64] = {0};
-    int bytesRead = fs_read(file, buffer, sizeof(buffer));
+    // Reading data back from the file
+    char buffer[128];
+    int bytesRead = fs_read(myFile, buffer, sizeof(buffer));
     if (bytesRead < 0) {
-        printf("Failed to read data from file.\n");
-        fs_close(file);
+        printf("Failed to read data from 'test.txt'.\n");
+        fs_close(myFile);
         return -1;
     }
-    printf("Read %d bytes from 'testfile.txt': %s\n", bytesRead, buffer);
+    printf("Read %d bytes from 'test.txt': %s\n", bytesRead, buffer);
 
-    // Test closing the file
-    fs_close(file);
-    printf("Closed 'testfile.txt'.\n");
+    // Closing the file
+    fs_close(myFile);
+    printf("'test.txt' closed after reading.\n");
+
+    printf("Filesystem Test Complete\n");
 
     return 0;
 }

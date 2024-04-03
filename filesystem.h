@@ -6,7 +6,7 @@
 #include <stdbool.h>
 
 #define MAX_FILES 10  // Maximum number of files in the filesystem
-#define MAX_FILE_SIZE 1024
+
 
 typedef enum {
     MODE_READ = 1, // Read mode
@@ -20,7 +20,7 @@ typedef struct {
     char filename[256];     // Path of the file
     uint32_t size;      // Size of the file
     bool in_use;        // Indicates if this file entry is in use
-    uint8_t data[MAX_FILE_SIZE]; // Pre-allocated space for file data
+    uint32_t flash_address; // Offset in flash memory where the file data starts
 } FileEntry;
 
 // File handle structure
@@ -40,7 +40,7 @@ void fs_close(FS_FILE* file);
 int fs_read(FS_FILE* file, void* buffer, int size);
 int fs_write(FS_FILE* file, const void* buffer, int size);
 int fs_seek(FS_FILE* file, long offset, int whence);
-
+void fs_init(void);
 //int fs_format(const char* path);
 //int fs_wipe(const char* path);
 //int fs_mv(const char* old_path, const char* new_path);

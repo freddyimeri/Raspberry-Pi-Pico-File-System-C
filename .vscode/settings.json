@@ -3,6 +3,9 @@
         "flash_ops.h": "c",
         "gpio.h": "c",
         "string.h": "c",
-        "stdlib.h": "c"
+        "stdlib.h": "c",
+        "filesystem.h": "c",
+        "stdio.h": "c",
+        "stddef.h": "c"
     }
 }
