@@ -14,7 +14,6 @@ typedef enum {
     MODE_APPEND    // Append mode
 } FileMode;
 
-
 // File entry structure
 typedef struct {
     char filename[256];     // Path of the file
@@ -29,9 +28,6 @@ typedef struct {
     uint32_t position;  // Current position in the file
     FileMode mode; 
 } FS_FILE;
-
- 
-
 
 
 

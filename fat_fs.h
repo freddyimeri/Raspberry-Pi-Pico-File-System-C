@@ -7,7 +7,7 @@
  
 
 #define FLASH_MEMORY_SIZE_BYTES 2 * 1024 * 1024 // Example: 2MB flash size
-#define FLASH_BLOCK_SIZE 4096 // Example: 4KB per block
+#define FLASH_BLOCK_SIZE 4096 
 #define TOTAL_BLOCKS (FLASH_MEMORY_SIZE_BYTES / FLASH_BLOCK_SIZE)
 
 // Special FAT entry values
