@@ -6,6 +6,7 @@
         "stdlib.h": "c",
         "filesystem.h": "c",
         "stdio.h": "c",
-        "stddef.h": "c"
+        "stddef.h": "c",
+        "stdbool.h": "c"
     }
 }

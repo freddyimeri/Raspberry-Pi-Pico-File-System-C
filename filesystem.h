@@ -20,7 +20,7 @@ typedef struct {
     char filename[256];     // Path of the file
     uint32_t size;      // Size of the file
     bool in_use;        // Indicates if this file entry is in use
-    uint32_t flash_address; // Offset in flash memory where the file data starts
+    uint32_t start_block; // Offset in flash memory where the file data starts
 } FileEntry;
 
 // File handle structure
@@ -41,6 +41,7 @@ int fs_read(FS_FILE* file, void* buffer, int size);
 int fs_write(FS_FILE* file, const void* buffer, int size);
 int fs_seek(FS_FILE* file, long offset, int whence);
 void fs_init(void);
+
 //int fs_format(const char* path);
 //int fs_wipe(const char* path);
 //int fs_mv(const char* old_path, const char* new_path);

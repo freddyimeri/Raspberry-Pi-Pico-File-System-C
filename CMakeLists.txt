@@ -13,6 +13,7 @@ add_executable(my_blink
   main.c
   flash_ops.c
   filesystem.c
+  fat_fs.c
 )
 
 pico_enable_stdio_usb(my_blink 1)
