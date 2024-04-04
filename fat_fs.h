@@ -16,7 +16,9 @@
 #define NO_TIMESTAMP 0xFFFFFFFF
 #define NO_SIZE 0xFFFFFFFF
 
-typedef uint32_t FAT_Entry;
+// In fat_fs.h
+extern uint32_t FAT[TOTAL_BLOCKS]; // Declare FAT but don't define it
+
   
 // Function declarations
 void fat_init(void);

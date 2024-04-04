@@ -3,7 +3,9 @@
 #include "flash_config.h"
 #include "hardware/flash.h"  // This is where FLASH_BLOCK_SIZE should be defined.
 
-FAT_Entry FAT[TOTAL_BLOCKS]; // The FAT table
+// FAT_Entry FAT[TOTAL_BLOCKS]; // The FAT table
+// In fat_fs.c
+uint32_t FAT[TOTAL_BLOCKS]; // Define FAT here
 
 // Initialize the FAT system
 void fat_init() {

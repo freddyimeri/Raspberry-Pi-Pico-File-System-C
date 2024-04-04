@@ -39,6 +39,8 @@ typedef struct {
 } DirectoryEntry;
 
 
+
+
 FS_FILE* fs_open(const char* path, const char* mode);
 void fs_close(FS_FILE* file);
 int fs_read(FS_FILE* file, void* buffer, int size);
@@ -46,7 +48,12 @@ int fs_write(FS_FILE* file, const void* buffer, int size);
 int fs_seek(FS_FILE* file, long offset, int whence);
 void fs_init(void);
 bool fs_create_directory(const char* path);
+DirectoryEntry* list_directory_contents(const char* path);
+// Inside filesystem.h
+FileEntry* find_file_by_path(const char* path);
+
 int fs_mv(const char* old_path, const char* new_path);
+int fs_wipe(const char* path);
 
 
 

@@ -3,13 +3,17 @@
 
 #include "pico/stdlib.h"  
  
+
+
+ #define FILESYSTEM_BLOCK_SIZE 4096
+
 // Use the SDK-provided definition for the total flash size
 #define FLASH_MEMORY_SIZE_BYTES PICO_FLASH_SIZE_BYTES
  
-
+ 
 
 // Define the total number of blocks in the flash memory
-#define TOTAL_BLOCKS (FLASH_MEMORY_SIZE_BYTES / FLASH_BLOCK_SIZE)
+#define TOTAL_BLOCKS (FLASH_MEMORY_SIZE_BYTES / FILESYSTEM_BLOCK_SIZE)
 
 // Define the offset from the start of the flash memory where user data can start.
 #define FLASH_TARGET_OFFSET (256 * 1024) // Reserve the first 256KB for system use or bootloader
@@ -18,6 +22,9 @@
 // considering any space reserved for metadata or wear leveling.
 #define FLASH_METADATA_SPACE (256 * 1024)  // Additional space reserved for metadata and wear leveling
 #define FLASH_USABLE_SPACE (FLASH_MEMORY_SIZE_BYTES - FLASH_METADATA_SPACE - FLASH_TARGET_OFFSET) // Usable space for user data
+ 
+#define ENTRIES_PER_BLOCK (FILESYSTEM_BLOCK_SIZE / sizeof(DirectoryEntry))
+
 
 // Maximum number of files supported by the filesystem
 #define MAX_FILES 10

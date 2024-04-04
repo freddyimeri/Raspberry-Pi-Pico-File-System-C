@@ -9,6 +9,7 @@
 #include "fat_fs.h"
 #include "flash_config.h"
 
+ 
 
 FileEntry fileSystem[MAX_FILES];
 
@@ -64,6 +65,74 @@ bool fs_create_directory(const char* path) {
     printf("Error: Filesystem is full, cannot create new directory.\n");
     return false;
 }
+ 
+
+ 
+// Helper Function to Read Directory Block into Buffer
+// Assumes `flash_read_safe` is a function that reads data from flash memory.
+void read_directory_block(uint32_t block_number, uint8_t *buffer, size_t buffer_size) {
+    // Calculate the physical address in flash memory based on block number
+    uint32_t address = block_number * FLASH_BLOCK_SIZE;
+    flash_read_safe(address, buffer, buffer_size);
+}
+
+
+
+DirectoryEntry* list_directory_contents(const char* path) {
+    FileEntry* directory = find_file_by_path(path);
+    if (!directory || !directory->is_directory) {
+        printf("Directory not found or path is not a directory.\n");
+        return NULL;
+    }
+
+    // Dynamically growable list of directory entries
+    DirectoryEntry* entries = NULL;
+    size_t allocated_entries = 0, entries_read = 0;
+
+    uint32_t current_block = directory->start_block;
+    bool end_of_directory_reached = false;
+
+    while (current_block != FAT_ENTRY_END && !end_of_directory_reached) {
+        // Allocate or expand entries array
+        allocated_entries += ENTRIES_PER_BLOCK; // ENTRIES_PER_BLOCK depends on your block size and DirectoryEntry size
+        DirectoryEntry* temp = realloc(entries, allocated_entries * sizeof(DirectoryEntry));
+        if (!temp) {
+            free(entries);
+            printf("Memory allocation failed.\n");
+            return NULL;
+        }
+        entries = temp;
+
+        // Read the current block
+        uint8_t block_buffer[FLASH_BLOCK_SIZE];
+        read_directory_block(current_block, block_buffer, FLASH_BLOCK_SIZE);
+        DirectoryEntry* block_entries = (DirectoryEntry*)block_buffer;
+
+        // Process each entry in the block
+        for (int i = 0; i < ENTRIES_PER_BLOCK && !end_of_directory_reached; ++i) {
+            if (strcmp(block_entries[i].name, "") == 0) { // Check for end-of-directory marker
+                end_of_directory_reached = true;
+                break;
+            }
+            // Copy entry to the entries array
+            memcpy(&entries[entries_read++], &block_entries[i], sizeof(DirectoryEntry));
+        }
+
+        // Move to the next block using the FAT table
+        current_block = FAT[current_block]; // Assumes FAT is accessible and current_block indexes into it
+    }
+
+    // Optionally, resize the entries array down to the exact number of entries read
+    if (entries_read < allocated_entries) {
+        DirectoryEntry* temp = realloc(entries, entries_read * sizeof(DirectoryEntry));
+        if (temp) {
+            entries = temp;
+        } // If realloc fails, keep the original size
+    }
+
+    return entries; // Caller is responsible for freeing this memory
+}
+
 
 
 FileEntry* find_file_by_path(const char* path) {
@@ -389,4 +458,54 @@ int fs_mv(const char* old_path, const char* new_path) {
     fileSystem[fileIndex].filename[sizeof(fileSystem[fileIndex].filename) - 1] = '\0'; // Ensure null-termination
 
     return 0; // Success
+}
+
+
+int fs_wipe(const char* path) {
+    // Check if path is NULL
+    if (path == NULL) {
+        printf("Error: Path is NULL.\n");
+        return -1; // Indicate an error
+    }
+
+    // Find the file or directory entry
+    FileEntry* entry = find_file_by_path(path);
+    if (entry == NULL) {
+        printf("Error: File or directory not found.\n");
+        return -2; // Indicate file not found
+    }
+
+    // If it's a directory, recursively wipe its contents
+    if (entry->is_directory) {
+        // The implementation here assumes you have a way to list and iterate through directory contents.
+        // This could be a function like list_directory_contents() which returns a list of paths or entries within the directory.
+        DirectoryEntry* dirEntries = list_directory_contents(path); // Hypothetical function
+        for (int i = 0; dirEntries[i].name[0] != '\0'; i++) {
+            // Construct the full path for each entry
+            char fullPath[256]; // Assuming 256 is the max path length
+            snprintf(fullPath, sizeof(fullPath), "%s/%s", path, dirEntries[i].name);
+
+            // Recursively call fs_wipe on each entry
+            int result = fs_wipe(fullPath);
+            if (result != 0) {
+                printf("Warning: Failed to wipe '%s' within directory.\n", fullPath);
+                // Decide how to handle partial failures. Continue, abort, or revert?
+            }
+        }
+        // Depending on your design, you may need to free any allocated memory for dirEntries
+    }
+
+    // Deallocate blocks associated with this file or directory
+    uint32_t currentBlock = entry->start_block;
+    while (currentBlock != FAT_ENTRY_END && currentBlock < TOTAL_BLOCKS) {
+        uint32_t nextBlock = fat_get_next_block(currentBlock);
+        fat_free_block(currentBlock);
+        currentBlock = nextBlock;
+    }
+
+    // Mark the file system entry as not in use and optionally clear it
+    entry->in_use = false;
+    memset(entry, 0, sizeof(FileEntry));
+
+    return 0; // Indicate success
 }
