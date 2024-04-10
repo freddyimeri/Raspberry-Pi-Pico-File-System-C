@@ -10,6 +10,11 @@
         "stdbool.h": "c",
         "flash_config.h": "c",
         "flash.h": "c",
-        "fat_fs.h": "c"
+        "fat_fs.h": "c",
+        "mutex.h": "c",
+        "sync.h": "c",
+        "time.h": "c",
+        "stdint.h": "c",
+        "directories.h": "c"
     }
 }
