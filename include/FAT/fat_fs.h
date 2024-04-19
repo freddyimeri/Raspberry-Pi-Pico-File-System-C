@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include "flash_config.h"  // Include configuration for filesystem parameters
+#include "../config/flash_config.h"    
 
 // Special FAT entry values are defined here to manage the state of each block in the filesystem.
 #define FAT_ENTRY_FREE 0xFFFFFFFF     // Indicates a block is currently unused and available for allocation.

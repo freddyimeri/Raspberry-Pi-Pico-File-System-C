@@ -9,14 +9,22 @@ set(CMAKE_CXX_STANDARD 17)
 
 pico_sdk_init()
 
-add_executable(my_blink
-  main.c
-  flash_ops.c
-  filesystem.c
-  fat_fs.c
-  Directories.c
-)
+# Include directories
+include_directories(include/directory)
+include_directories(include/FAT)
+include_directories(include/filesystem)
+include_directories(include/flash)
 
+add_executable(my_blink
+    src/main.c
+    src/flash/flash_ops.c
+    src/filesystem/filesystem_helper.c
+    src/filesystem/filesystem.c
+    src/FAT/fat_fs.c
+    src/directory/directories.c
+    src/directory/directory_helpers.c
+    
+)
 pico_enable_stdio_usb(my_blink 1)
 pico_enable_stdio_uart(my_blink 0)
 

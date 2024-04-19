@@ -1,13 +1,12 @@
-#include "flash_ops.h"
 #include <stdio.h>
 #include <string.h>
 #include "hardware/flash.h"
 #include "hardware/sync.h"
-#include "flash_config.h"
+ 
 
 
-
-
+#include "../config/flash_config.h"    
+#include "../flash/flash_ops.h"   
 // Define the min macro if it's not already defined
 #ifndef min
 #define min(a,b) ((a) < (b) ? (a) : (b))
@@ -63,20 +62,6 @@ void flash_write_safe_struct(uint32_t offset, flash_data_t *new_data) {
 
 
 
-void flash_read_safe_struct(uint32_t offset, flash_data_t *data) {
-    if (offset + sizeof(flash_data_t) > FLASH_TARGET_OFFSET + FLASH_MEMORY_SIZE_BYTES) {
-        printf("Error: Attempt to read beyond flash memory limits.\n");
-        fflush(stdout);
-        return;
-    }
-
-    // Ensure we're reading from a valid area within the flash memory designated for user data
-    uint32_t absoluteAddress = XIP_BASE + offset;
-
-    // Reading the entire flash_data_t struct from flash into the provided data pointer
-    memcpy(data, (const void *)absoluteAddress, sizeof(flash_data_t));
-}
-
  
 
 
@@ -88,7 +73,7 @@ void flash_write_safe(uint32_t offset, const uint8_t *data, size_t data_len) {
     flash_write_safe_struct(offset, &flashData);
 }
 
- 
+
 
 
 void flash_read_safe(uint32_t offset, uint8_t *buffer, size_t buffer_len) {
@@ -101,25 +86,34 @@ void flash_read_safe(uint32_t offset, uint8_t *buffer, size_t buffer_len) {
     size_t readLen = min(flashData.data_len, buffer_len);
 
 
-    // printf("\n\nDebug section in flash_read_safe\n");
+    printf("\n\nDebug section in flash_read_safe\n");
   
-    // printf("Offset: %d\n", offset);
-    // printf("readLen %zu\n", readLen);
+    printf("Offset: %d\n", offset);
+    printf("readLen %zu\n", readLen);
   
     
-    // printf("END Debug section in flash_read_safe\n\n");
+    printf("END Debug section in flash_read_safe\n\n");
 
-    // printf("Data read: ");
-    // for(size_t i = 0; i < readLen; i++) {
-    //     printf("%c", buffer[i]);
-    // }
-    // printf("\n");
-    // fflush(stdout);
-
-    // Copy the data from the struct to the provided buffer
-    memcpy(buffer, flashData.data, readLen);
+    // memcpy(buffer, flashData.data, readLen);
 }
 
+
+void flash_read_safe_struct(uint32_t offset, flash_data_t *data) {
+    printf("\n\nDebug section in flash_read_safe_struct\n");
+    if (offset + sizeof(flash_data_t) > FLASH_TARGET_OFFSET + FLASH_MEMORY_SIZE_BYTES) {
+        printf("Error: Attempt to read beyond flash memory limits.\n");
+        fflush(stdout);
+        return;
+    }
+
+    // Ensure we're reading from a valid area within the flash memory designated for user data
+    uint32_t absoluteAddress = XIP_BASE + offset;
+    printf("Absolute Address: %d\n", absoluteAddress);
+
+    // Reading the entire flash_data_t struct from flash into the provided data pointer
+    memcpy(data, (const void *)absoluteAddress, sizeof(flash_data_t));
+     printf("END Debug section in flash_read_safe_struct\n\n");
+}
 
 void flash_erase_safe(uint32_t offset) {
     uint32_t ints = save_and_disable_interrupts();
@@ -139,4 +133,79 @@ void flash_erase_safe(uint32_t offset) {
 }
 
 
+// Function: flash_read_safe2
+// Reads data from flash memory into a buffer.
+//
+// Parameters:
+// - offset: The offset from FLASH_TARGET_OFFSET where data is to be read.
+// - buffer: Pointer to the buffer where read data will be stored.
+// - buffer_len: Number of bytes to read.
+//
+// Note: The function performs bounds checking to ensure safe access.
+void flash_read_safe2(uint32_t offset, uint8_t *buffer, size_t buffer_len) {
+
+    // Calculate absolute flash offset
+    uint32_t flash_offset =  offset;
+
+    printf("\n\n\nDebug section in flash_read_safe2\n");
+    printf("flash_offset: %d\n", flash_offset);
+    printf("offset: %d\n", offset);
+    printf("buffer_len: %d\n", buffer_len);
+    printf("END Debug section in flash_read_safe2\n\n\n");
+ 
+    
+    // Perform the memory copy from flash to buffer
+    memcpy(buffer, (void *)(XIP_BASE + flash_offset), buffer_len);
+}
+
+
+
+// Function: flash_write_safe
+// Writes data to flash memory at a specified offset, ensuring safety checks.
+//
+// Parameters:
+// - offset: The offset from FLASH_TARGET_OFFSET where data is to be written.
+// - data: Pointer to the data to be written.
+// - data_len: Length of the data to be written.
+//
+// Note: This function erases the flash sector before writing new data.
+void flash_write_safe2(uint32_t offset, const uint8_t *data, size_t data_len) {
+
+    // Calculate absolute flash offset
+    uint32_t flash_offset =  offset;
+
+  
+    // Disable interrupts for a safe flash operation
+    uint32_t ints = save_and_disable_interrupts();
+
+    // Erase the flash sector before writing
+    flash_range_erase(flash_offset, FLASH_SECTOR_SIZE);
+
+    // Write data to flash
+    flash_range_program(flash_offset, data, data_len);
+
+    // Restore interrupts
+    restore_interrupts(ints);
+}
+
+
+
+
+
+void flash_erase_safe2(uint32_t offset) {
+    uint32_t ints = save_and_disable_interrupts();
+    uint32_t sector_start = offset;;
+    if (sector_start < FLASH_TARGET_OFFSET + FLASH_MEMORY_SIZE_BYTES) {
+    	flash_range_erase(offset, FLASH_SECTOR_SIZE);
+    } 
+    else 
+    {
+        printf("Error: Sector start address is out of bounds.\n");
+        fflush(stdout);
+        // Restore interrupts before returning due to error
+        restore_interrupts(ints);
+        return;
+    }
+    restore_interrupts(ints);
+}
 

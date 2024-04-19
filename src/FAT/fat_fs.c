@@ -40,11 +40,12 @@
 
 #include "fat_fs.h"
 #include <stdio.h>
-#include "flash_config.h"
 #include "hardware/flash.h"   
-#include "filesystem.h"
 #include "pico/mutex.h"
 #include "pico/time.h"
+
+#include "../filesystem/filesystem.h"  
+#include "../config/flash_config.h"    
 
 
 #define ALLOCATE_BLOCK_MAX_RETRIES 3 // Max attempts to allocate a block before giving up
@@ -68,6 +69,7 @@ void fat_init() {
     for (uint32_t i = 0; i < NUMBER_OF_RESERVED_BLOCKS; i++) {
         FAT[i] = FAT_ENTRY_RESERVED;
     }
+
 
     mutex_exit(&fat_mutex); // Release the mutex after initializing the FAT
 

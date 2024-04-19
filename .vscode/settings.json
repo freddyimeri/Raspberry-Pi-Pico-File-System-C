@@ -15,6 +15,9 @@
         "sync.h": "c",
         "time.h": "c",
         "stdint.h": "c",
-        "directories.h": "c"
+        "directories.h": "c",
+        "ctype.h": "c",
+        "filesystem_helper.h": "c",
+        "directory_helpers.h": "c"
     }
 }
