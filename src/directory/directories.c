@@ -44,7 +44,78 @@ bool initialize_directory_block(uint32_t block_number) {
     return true; // Indicate success
 }
 
-int split_path(const char* fullPath, char* directoryPath, char* fileName) {
+
+// int split_path(const char* fullPath, char* directoryPath, char* fileName) {
+//     char tempPath[256];
+//     strcpy(tempPath, fullPath); // Make a copy of fullPath for manipulation
+
+//     char *lastSlash = strrchr(tempPath, '/');
+//     bool fileEncountered = false; // Flag to mark when a file has been encountered
+
+//     // Initialize the outputs
+//     directoryPath[0] = '\0';
+//     fileName[0] = '\0';
+
+//     if (lastSlash) {
+//         *lastSlash = '\0'; // Terminate the directory path
+//         strcpy(fileName, lastSlash + 1); // Copy the file name part
+//         strcpy(directoryPath, tempPath); // Copy the directory part
+//     } else {
+//         // No slashes found, it's a single segment
+//         strcpy(fileName, fullPath);
+//     }
+    
+
+//     // Check each segment for a file pattern
+//     strcpy(tempPath, fullPath); // Reset tempPath
+//     char *segment = strtok(tempPath, "/");
+//     while (segment) {
+//         if (strrchr(segment, '.') != NULL) { // Check if the segment looks like a file
+//             fileEncountered = true;
+//         } else if (fileEncountered) { // A directory or another segment follows a file
+//             printf("Invalid path: '%s'. A file segment cannot be followed by another segment.\n", fullPath);
+//             return -1; // Error due to invalid path structure
+//             // return NULL;
+//         }
+//         segment = strtok(NULL, "/");
+//     }
+
+//     // Determine if the final part is a file or directory
+//     bool finalPartIsFile = strrchr(fileName, '.') != NULL;
+
+//     // Debug output
+//     printf("Debug: split_path()\n");
+//     printf("Input Path: '%s'\n", fullPath);
+//     printf("Extracted Directory: '%s'\n", directoryPath);
+//     printf("Extracted File Name: '%s'\n", fileName);
+//     printf("Is File: %s\n", finalPartIsFile ? "Yes" : "No");
+
+//         // Only process directory operations if a directory path exists
+//     if (directoryPath[0] != '\0') {
+//         printf("START process_directory_operation(const char* path)\n");
+//         process_directory_operation(directoryPath);
+//         printf("END process_directory_operation(const char* path)\n");
+//     }
+//     //  Process file creation if the final part is determined to be a file
+//     if (finalPartIsFile) {
+//         char fullPath[512];
+//         sprintf(fullPath, "%s/%s", directoryPath, fileName); // Construct the full path for the file
+//         process_file_creation(fullPath); // Call to check or create the file
+//     }
+
+//     //   if (finalPartIsFile) {
+//     //     char fullPath[512];
+//     //     sprintf(fullPath, "%s/%s", directoryPath, fileName); // Construct the full path for the file
+//     //     FS_FILE* file = process_file_creation(fullPath); // Call to check or create the file
+//     //     // return file;
+//     // }
+
+
+//     return finalPartIsFile ? 1 : 0;
+//     // return NULL;
+// }
+
+ FS_FILE* split_path(const char* fullPath, char* directoryPath, char* fileName) {
     char tempPath[256];
     strcpy(tempPath, fullPath); // Make a copy of fullPath for manipulation
 
@@ -63,7 +134,7 @@ int split_path(const char* fullPath, char* directoryPath, char* fileName) {
         // No slashes found, it's a single segment
         strcpy(fileName, fullPath);
     }
-
+    
     // Check each segment for a file pattern
     strcpy(tempPath, fullPath); // Reset tempPath
     char *segment = strtok(tempPath, "/");
@@ -72,7 +143,7 @@ int split_path(const char* fullPath, char* directoryPath, char* fileName) {
             fileEncountered = true;
         } else if (fileEncountered) { // A directory or another segment follows a file
             printf("Invalid path: '%s'. A file segment cannot be followed by another segment.\n", fullPath);
-            return -1; // Error due to invalid path structure
+            return NULL;
         }
         segment = strtok(NULL, "/");
     }
@@ -87,17 +158,21 @@ int split_path(const char* fullPath, char* directoryPath, char* fileName) {
     printf("Extracted File Name: '%s'\n", fileName);
     printf("Is File: %s\n", finalPartIsFile ? "Yes" : "No");
 
-    printf("START process_directory_operation(const char* path)");
-    process_directory_operation(directoryPath);
-    printf("END process_directory_operation(const char* path)");
-    //  Process file creation if the final part is determined to be a file
+    // Only process directory operations if a directory path exists
+    if (directoryPath[0] != '\0') {
+        printf("START process_directory_operation(const char* path)\n");
+        process_directory_operation(directoryPath);
+        printf("END process_directory_operation(const char* path)\n");
+    }
+    // Process file creation if the final part is determined to be a file
     if (finalPartIsFile) {
-        char fullPath[512];
-        sprintf(fullPath, "%s/%s", directoryPath, fileName); // Construct the full path for the file
-        process_file_creation(fullPath); // Call to check or create the file
+        char fullPathConstructed[512];
+        sprintf(fullPathConstructed, "%s/%s", directoryPath, fileName); // Construct the full path for the file
+        FS_FILE* file = process_file_creation(fullPathConstructed); // Call to check or create the file
+        return file; // Return the file pointer
     }
 
-    return finalPartIsFile ? 1 : 0;
+    return NULL; // Return NULL if no file is created or opened
 }
 
  

@@ -22,5 +22,6 @@ void process_directory_operation(const char* path);
 
 PathSegments extract_path_segments(const char* fullPath);
 void free_path_segments(PathSegments* pathSegments);
+bool has_file_extension(const char* segment);
 
 #endif // FILESYSTEM_HELPER_H

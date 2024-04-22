@@ -174,7 +174,18 @@ void flash_write_safe2(uint32_t offset, const uint8_t *data, size_t data_len) {
     // Calculate absolute flash offset
     uint32_t flash_offset =  offset;
 
-  
+
+    ////////////////// EDITED BY ME //////////////////
+ 
+    ////////////////// EDITED BY ME //////////////////
+
+
+    printf("\n\n\nDebug section in flash_write_safe2\n");
+    printf("flash_offset: %d\n", flash_offset);
+    printf("offset: %d\n", offset);
+    printf("data_len: %d\n", data_len);
+    printf("FLASH_SECTOR_SIZE: %d\n", FLASH_SECTOR_SIZE);
+    printf("END Debug section in flash_write_safe2\n\n\n");
     // Disable interrupts for a safe flash operation
     uint32_t ints = save_and_disable_interrupts();
 
@@ -186,6 +197,9 @@ void flash_write_safe2(uint32_t offset, const uint8_t *data, size_t data_len) {
 
     // Restore interrupts
     restore_interrupts(ints);
+    printf("\n Debug flash_write_safe2 : Data written to flash memoryaaaaaaa.\n");
+    fflush(stdout);
+    
 }
 
 

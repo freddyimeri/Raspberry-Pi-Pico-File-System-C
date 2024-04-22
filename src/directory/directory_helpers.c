@@ -11,7 +11,6 @@
 
 #include "../directory/directory_helpers.h"
 
-bool has_file_extension(const char* segment);
 
 
 
@@ -271,3 +270,187 @@ bool has_file_extension(const char* segment) {
 
 
 
+
+
+
+
+
+// typedef struct {
+//     uint32_t lastDirId;
+// } FS_Metadata;
+
+// FS_Metadata fs_metadata;
+
+// // Function to initialize filesystem metadata
+// void fs_init() {
+//     // Read the last directory ID from flash
+//     flash_read_safe(FLASH_STORAGE_ADDRESS, (uint8_t*)&fs_metadata, sizeof(FS_Metadata));
+//     printf("Filesystem initialized with last directory ID: %u\n", fs_metadata.lastDirId);
+// }
+
+// // Function to get a new unique directory ID
+// uint32_t get_new_directory_id() {
+//     fs_metadata.lastDirId++;  // Increment the last used ID to generate a new one
+//     // Optionally write to flash every time an ID is generated (or defer this to minimize writes)
+//     flash_write_safe(FLASH_STORAGE_ADDRESS, (const uint8_t*)&fs_metadata, sizeof(FS_Metadata));
+//     return fs_metadata.lastDirId;
+// }
+
+// // Function to save filesystem state before shutdown
+// void fs_shutdown() {
+//     // Ensure the latest directory ID is saved to flash
+//     flash_write_safe(FLASH_STORAGE_ADDRESS, (const uint8_t*)&fs_metadata, sizeof(FS_Metadata));
+//     printf("Filesystem state saved with last directory ID: %u\n", fs_metadata.lastDirId);
+// }
+
+// int main() {
+//     fs_init();  // Initialize and load metadata from flash
+//     uint32_t newDirId = get_new_directory_id();  // Get a new directory ID
+//     printf("Generated new directory ID: %u\n", newDirId);
+//     fs_shutdown();  // Save state before exiting
+//     return 0;
+// }
+
+
+
+
+ 
+
+// typedef struct {
+//     uint32_t entryId;
+//     bool in_use;    
+// } FS_entryId;
+
+// static FS_entryId entryId[MAX_DIRECTORY_ENTRIES];
+ 
+
+
+ 
+
+// int allocateEntryId() {
+//     // loop that generates the entryId for the directory/file entries
+//     for (int i = 4500; i < 4500 + MAX_DIRECTORY_ENTRIES; i++) {
+//         // loop for location of the entryId
+//         for (int p = 0; p < MAX_DIRECTORY_ENTRIES; p++) {
+//             printf("Processing index: %d\n", p);
+//             if (entryId[p].in_use == true) {
+//                 printf("Entry ID %u is in use.\n", entryId[p].entryId);
+//             } else {
+//                 entryId[p].entryId = i;
+//                 entryId[p].in_use = true;
+//                 printf("Entry ID %u is now in use.\n", entryId[p].entryId);
+//                 return i;
+//             }
+//         }
+//     }
+//     return -1; // If no ID is available
+// }
+
+ 
+
+// // save the static FS_entryId entryId[MAX_DIRECTORY_ENTRIES]; in the flash 
+
+// void save_entryId(void) {
+//     // find space in the flash to save the entryId using FAT system
+//     //print the size of it the whole array
+//     flash_write_safe(FLASH_STORAGE_ADDRESS, (const uint8_t*)&entryId, sizeof(entryId));
+// }
+
+// // recover the entryId from the flash
+// void recover_entryId(void) {
+//     // if entryId is empty, then allocate then recover the entries from the flash
+//     if (entryId[0].entryId == 0) {
+//         // look though the flash entries to find the entryId
+//         // Look through the flash entries to find the entryId
+//         for (uint32_t i = 0; i < TOTAL_BLOCKS; i++) {
+
+
+//             // Read the entry from flash
+//             flash_read_safe(FLASH_STORAGE_ADDRESS + i * sizeof(FS_entryId), (uint8_t*)&entryId, sizeof(FS_entryId));
+//             // Check if the entry is in use
+//             if (entryId[0].in_use) {
+//                 // Entry is in use, continue searching
+//                 continue;
+//             } else {
+//                 // Entry is available, break the loop
+//                 break;
+//             }
+//         }
+//         // Allocate a new entry ID
+//         uint32_t newEntryId = allocateEntryId();
+//         if (newEntryId == -1) {
+//             printf("No available entry ID.\n");
+//             // Handle error: No available entry ID
+//             return;
+//         }
+//         printf("Allocated new entry ID: %u\n", newEntryId);
+
+//         // Save the updated entry ID array to flash
+//         save_entryId();
+
+//         // Recover the entry ID array from flash
+//         recover_entryId();
+
+//         // Recover the directory entries using the recovered entry ID array
+//         DirectoryEntry* recoveredEntries = recover_entries_Id();
+//         allocateEntryId();
+//         flash_read_safe(FLASH_STORAGE_ADDRESS, (uint8_t*)&entryId, sizeof(entryId));
+//     }
+//     // read the entryId from the flash
+//     flash_read_safe(FLASH_STORAGE_ADDRESS, (uint8_t*)&entryId, sizeof(entryId));
+//     //print the size of it the whole array
+//     printf("Size of entryId: %lu\n", sizeof(entryId));
+// }
+
+
+
+
+
+// FS_entryId* recover_entries_Id(void) {
+//     printf("\n\nENTERED recover_entries_Id\n");
+//     fflush(stdout);
+
+//     for (uint32_t i = 0; i < TOTAL_BLOCKS; i++) {
+//          if (FAT[i] == FAT_ENTRY_END) {
+
+//             uint32_t address = i * FILESYSTEM_BLOCK_SIZE;
+            
+//             FS_entryId tempEntryId;  // Temporary storage
+
+//             printf("Checking block %u\n", i);
+//             fflush(stdout);
+
+//             uint32_t address = i * FILESYSTEM_BLOCK_SIZE;
+//             DirectoryEntry dirEntry;  // Temporary storage
+//             flash_read_safe2(address, (uint8_t *)&dirEntry, sizeof(DirectoryEntry));
+ 
+//             fflush(stdout);
+            
+            
+//         }
+//     }
+ 
+// }
+
+
+
+// int allocateEntryId() {
+//     // loop that generates the entryId for the directory/file entries
+//     for (int i = 4500; i < 4500 + MAX_DIRECTORY_ENTRIES; i++) {
+//         // loop for location of the entryId
+//         for (int p = 0; p < MAX_DIRECTORY_ENTRIES; p++) {
+//             printf("Processing index: %d\n", p);
+//             if (entryId[p].in_use == true) {
+//                 printf("Entry ID %u is in use.\n", entryId[p].entryId);
+//             } else {
+//                 entryId[p].entryId = i;
+//                 entryId[p].in_use = true;
+//                 printf("Entry ID %u is now in use.\n", entryId[p].entryId);
+//                 return i;
+//             }
+//         }
+//     }
+//     return -1; // If no ID is available
+// }
+
+ 

@@ -17,6 +17,7 @@ typedef struct {
     uint32_t size;        // Size (for files) or number of entries (for directories)
     uint32_t start_block; // Start block in flash memory
     bool in_use;  
+    char buffer[1256];  
 } DirectoryEntry;
 
 
@@ -30,7 +31,8 @@ bool is_directory_valid(const DirectoryEntry* directoryEntry);
 
 void split_path_into_parent_and_dir(const char* fullPath, char* parentPath, char* dirName) ;
  
-int split_path(const char* fullPath, char* directoryPath, char* fileName);
+// int split_path(const char* fullPath, char* directoryPath, char* fileName);
+FS_FILE* split_path(const char* fullPath, char* directoryPath, char* fileName);
 
 DirectoryEntry* DIR_find_directory_entry(const char* directoryName);
 DirectoryEntry* find_directory_entry(const char* path);

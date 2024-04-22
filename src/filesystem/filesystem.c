@@ -19,6 +19,14 @@
 #ifndef min
 #define min(a,b) ((a) < (b) ? (a) : (b))
 #endif
+
+
+/////fs_seek/////////////
+#define SEEK_SET 0  // Start of the file
+#define SEEK_CUR 1  // Current position in the file
+#define SEEK_END 2  // End of the file
+////////////////////////
+
  
 bool fs_initialized = false;
 static mutex_t filesystem_mutex;
@@ -125,16 +133,7 @@ void fs_init() {
 }
 
 
-
  
- 
-// /**
-//  * Opens a file with the specified path and mode.
-//  *
-//  * @param path The path of the file to be opened.
-//  * @param mode The mode in which the file should be opened.
-//  * @return A pointer to the opened file, or NULL if an error occurred.
-//  */
 FS_FILE* fs_open(const char* FullPath, const char* mode) {
 
      if (FullPath == NULL || mode == NULL) {
@@ -143,86 +142,234 @@ FS_FILE* fs_open(const char* FullPath, const char* mode) {
         return NULL;
     }
 
-    PathParts parts = extract_last_two_parts(FullPath);
+     if (strcmp(mode, "a") == 0) 
+    {
+        printf("Opening file '%s' in append mode.\n", FullPath);
+        const char* path = prepend_slash(FullPath);
+        
+        printf("Path: %s\n", path);
+        FileEntry* entry = FILE_find_file_entry(path);
+        
+        
+        // int len = strlen(entry->buffer);
+        int len = entry->size;  // Assuming size is maintained correctly
+        printf("len: %d\n", len);
 
 
-    const char* path = parts.filename;
-    const char* directoryName = parts.directory;
-
-
-
-    printf("Directory: %s\n", parts.directory);  
-    printf("Filename: %s\n", parts.filename);   
-
-
-    if (directoryName[0] == '\0') {
-        directoryName = "/root";  // Default to the root directory
-        printf("No directory specified, defaulting to root: %s\n", directoryName);
-    }
-
-
-    
-    
-    FileEntry* entry = FILE_find_file_entry(path);
-    bool isNewFileCreation = (entry == NULL) && (strchr("wa", mode[0]) != NULL);
-    
-    DirectoryEntry* dirEntry = DIR_find_directory_entry(directoryName);
-
-    uint32_t parentID;
-    if (dirEntry) {
-        parentID = dirEntry->currentDirId;
-        // If the directory is found, access its parentDirId and other details
-        printf("Directory '%s' found with ParentDirId: %u\n", directoryName, dirEntry->currentDirId);
-        free(dirEntry);
-    } else {
-        // If the directory is not found, handle this case
-        printf("EROR: Directory '%s' not found.\n", directoryName);
-    }
-
-    // Attempt to create a new file entry if the file does not exist and the mode allows for writing or appending
-    if (isNewFileCreation) {
-        entry = create_new_file_entry(path, parentID);
         if (entry == NULL) {
-            return NULL; // Error message is handled in create_new_file_entry
-        }
-    } else if (entry == NULL) {
-        printf("Error: File not found for reading.\n");
-        fflush(stdout);
+        printf("Error: File '%s' not found for reading.\n", FullPath);
         return NULL;
-    }
+        }
 
-    // Special handling for 'w' mode: reset the file if it exists
+
+            // Create and initialize the FS_FILE structure
+        FS_FILE* file = (FS_FILE*)malloc(sizeof(FS_FILE));
+        if (file == NULL) {
+            printf("Error: Memory allocation failed for FS_FILE.\n");
+            fflush(stdout);
+            return NULL;
+        }
+
+        file->entry = entry;
+        file->position = file->position + len; // Append mode sets position to the end
+        file->mode = 'a';  // Simplified mode determination
+        // strcpy(file->mode, "a"); 
+        
+
+    
+        return file;
+
+    }
+   
+
+    if (strcmp(mode, "r") == 0) 
+    {
+        printf("Opening file '%s' in read mode.\n", FullPath);
+        const char* path = prepend_slash(FullPath);
+        
+        printf("Path: %s\n", path);
+        FileEntry* entry = FILE_find_file_entry(path);
+
+
+        if (entry == NULL) {
+        printf("Error: File '%s' not found for reading.\n", FullPath);
+        return NULL;
+        }
+
+
+            // Create and initialize the FS_FILE structure
+        FS_FILE* file = (FS_FILE*)malloc(sizeof(FS_FILE));
+        if (file == NULL) {
+            printf("Error: Memory allocation failed for FS_FILE.\n");
+            fflush(stdout);
+            return NULL;
+        }
+
+        file->entry = entry;
+        file->position = 0; // Append mode sets position to the end
+        file->mode = 'r'; // Simplified mode determination
+        // strcpy(file->mode, "r"); 
+  
+
+    
+        return file;
+
+    }
+   
+
+
     if (strcmp(mode, "w") == 0) {
+
+        printf("Opening file '%s' in write mode.\n", FullPath);
+        PathParts parts = extract_last_two_parts(FullPath);
+        const char* path = prepend_slash(parts.filename);
+        const char* directoryName = parts.directory;
+        if (path != NULL) {
+        printf("Modified Path: %s\n", path);
+        } else {
+            printf("Failed to modify the path.\n");
+        }
+
+        if (directoryName[0] == '\0') {
+            directoryName = "/root";  // Default to the root directory
+            printf("No directory specified, defaulting to root: %s\n", directoryName);
+        }
+
+        FileEntry* entry = FILE_find_file_entry(path);
+        bool isNewFileCreation = (entry == NULL) && (strchr("wa", mode[0]) != NULL);
+ 
+         DirectoryEntry* dirEntry = DIR_find_directory_entry(directoryName);
+        
+        uint32_t parentID;
+        if (dirEntry) {
+            parentID = dirEntry->currentDirId;
+            // If the directory is found, access its parentDirId and other details
+            printf("Directory '%s' found with ParentDirId: %u\n", directoryName, dirEntry->currentDirId);
+            free(dirEntry);
+        } else {
+            // If the directory is not found, handle this case
+            printf("EROR: Directory '%s' not found.\n", directoryName);
+        }
+        printf("code 3\n");
+        // Attempt to create a new file entry if the file does not exist and the mode allows for writing or appending
+        if (isNewFileCreation) {
+            entry = create_new_file_entry(path, parentID);
+            if (entry == NULL) {
+                return NULL; // Error message is handled in create_new_file_entry
+            }
+        } else if (entry == NULL) {
+            printf("Error: File not found for reading.\n");
+            fflush(stdout);
+            return NULL;
+        }
+        printf("code 4\n");
+        // Special handling for 'w' mode: reset the file if it exists
+
+
         // reset_file_content(entry);
         uint32_t offsetInBytes;
-        printf("Path: %s\n", path);
-        printf("Entry start block: %u\n", entry->start_block);
-        printf("Entry size: %u\n", entry->size);
+        const uint32_t offsetFromEntry = entry->start_block;
+        printf("offsetFromEntry dd: %u\n", offsetFromEntry);
         //print the fileName 
-        offsetInBytes =  entry->start_block * FILESYSTEM_BLOCK_SIZE;    
-        flash_write_safe(offsetInBytes, (const uint8_t*)entry, sizeof(FileEntry));
- 
+        offsetInBytes =  offsetFromEntry * FILESYSTEM_BLOCK_SIZE;
+        printf("offsetInBytes dd: %u\n", offsetInBytes);
+        flash_write_safe2(offsetInBytes, (const uint8_t*)entry, sizeof(FileEntry));
 
-    }
+            // Create and initialize the FS_FILE structure
+        FS_FILE* file = (FS_FILE*)malloc(sizeof(FS_FILE));
+        if (file == NULL) {
+            printf("Error: Memory allocation failed for FS_FILE.\n");
+            fflush(stdout);
+            return NULL;
+        }
 
-    // Create and initialize the FS_FILE structure
-    FS_FILE* file = (FS_FILE*)malloc(sizeof(FS_FILE));
-    if (file == NULL) {
-        printf("Error: Memory allocation failed for FS_FILE.\n");
-        fflush(stdout);
-        return NULL;
-    }
-
-    file->entry = entry;
-    file->position = (strcmp(mode, "a") == 0) ? entry->size : 0; // Append mode sets position to the end
-    file->mode = determine_mode(mode); // Simplified mode determination
+        file->entry = entry;
+        file->position = 0 ;  
+        // strcpy(file->mode, "w"); // Simplified mode determination
+        file->mode = 'w'; // Simplified mode determination
 
  
     return file;
-}
  
 
+    }
+   
+    return NULL;
+}
 
+
+
+
+// Function to PRINT write data to a file
+int fs_write(FS_FILE* file, const void* buffer, int size) {
+
+    char tempFileName[256];  
+
+    if (strlen(file->entry->filename) < sizeof(tempFileName)) {
+        strcpy(tempFileName, file->entry->filename);  // Copy the filename
+        printf("Filename copied: %s\n", tempFileName);
+    } else {
+        printf("Filename too long to fit in tempFileName\n");
+    }
+
+    uint32_t numbs = find_file_entry_by_name(tempFileName);
+    printf("numbs: %d\n", numbs);
+
+    
+    printf("file->mode ss: %c\n", file->mode);
+    if (file->mode == 'a') {  
+        printf("Append mode fs_write\n");
+        // Copy the existing file content to a temporary buffer
+        char tempBuffer[256];
+        strcpy(tempBuffer, fileSystem[numbs].buffer);
+        printf("tempBuffer: %s\n", tempBuffer);
+        // Append the new data to the temporary buffer
+        strncat(tempBuffer, buffer, size);
+        printf("tempBuffer: %s\n", tempBuffer);
+        // Copy the updated content back to the file entry buffer
+        strcpy(fileSystem[numbs].buffer, tempBuffer);
+        printf("fileSystem[numbs].buffer: %s\n", fileSystem[numbs].buffer);
+
+        ////
+        // ADD The int size to the fileSystem[numbs].size 
+        fileSystem[numbs].size += size;
+     
+    } else {
+           printf("NON Append mode fs_write\n");
+        // Copy the new data directly to the file entry buffer
+        strcpy(fileSystem[numbs].buffer, buffer); 
+    }
+
+    
+
+    uint32_t writeOffset = (fileSystem[numbs].start_block * FILESYSTEM_BLOCK_SIZE);
+    
+    // Perform the write operation
+    // flash_write_safe2(writeOffset, (const uint8_t*)buffer, size);
+    printf("start debug fs_write\n");
+    printf("fileSystem[numbs]->buffer: %s\n", fileSystem[numbs].buffer);
+    printf("fileSystem[numbs]>filename: %s\n", fileSystem[numbs].filename);
+    printf("fileSystem[numbs]>size: %u\n", fileSystem[numbs].size);
+    printf("fileSystem[numbs]->start_block: %u\n", fileSystem[numbs].start_block);
+    printf("fileSystem[numbs]>parentDirId: %u\n", fileSystem[numbs].parentDirId);
+    printf("fileSystem[numbs]>is_directory: %d\n", fileSystem[numbs].is_directory);
+    printf("fileSystem[numbs]>in_use: %d\n", fileSystem[numbs].in_use);
+    printf("writeOffset: %u\n", writeOffset);
+    fflush(stdout);
+    printf("finish debug fs_write\n\n");
+
+
+    flash_write_safe2(writeOffset, (const uint8_t*)&fileSystem[numbs], sizeof(FileEntry));
+
+    // flash_write_safe2(writeOffset, (const uint8_t*)fileSystem[numbs], sizeof(fileSystem[numbs]));
+    printf("Data written to file fffffffffffffffffff.\n");
+    // Update file position
+    file->position += size;
+
+    return size;  // Return the number of bytes written
+}
+ 
+ 
 
 FileEntry* create_new_file_entry(const char* path, uint32_t parentID) {
     printf("debug create_new_file_entry for path: %s\n", path);
@@ -240,6 +387,8 @@ FileEntry* create_new_file_entry(const char* path, uint32_t parentID) {
             printf("Start block: %u\n", fileSystem[i].start_block);
             printf("File size: %u\n", fileSystem[i].size);
             printf("Filesystem entry index: %d\n", i);
+            printf("Parent Directory ID: %u\n", fileSystem[i].parentDirId);
+            
             fflush(stdout);
             if (fileSystem[i].start_block == FAT_NO_FREE_BLOCKS) {
                 printf("Error: No space left on device to create new file.\n");
@@ -321,311 +470,190 @@ void fs_close(FS_FILE* file) {
     free(file);
 }
 
+// /**
+//  * Reads data from the specified file into the provided buffer.
+//  *
+//  * @param file   A pointer to the FS_FILE structure representing the file to read from.
+//  * @param buffer A pointer to the buffer where the read data should be stored.
+//  * @param size   The number of bytes to read.
+//  * @return The number of bytes actually read, or -1 if an error occurred.
+//  */
+// int fs_read(FS_FILE* file, void* buffer, int size) {
+//     if (file == NULL || buffer == NULL || size <= 0) {
+//         printf("Error: Invalid parameters for fs_read.\n");
+//         fflush(stdout);
+//         return -1;
+//     }
+
+//     // if (file->mode != MODE_READ && file->mode != MODE_APPEND) {
+//     //     printf("Error: File is not open in a readable mode.\n");
+//     //     fflush(stdout);
+//     //     return -1;
+//     // }
+//     // printf("Starting fs_read: file position before read = %u, read size = %d\n", file->position, size);
+//     // fflush(stdout);
+//     int totalBytesRead = 0;
+//     uint8_t* buf = (uint8_t*)buffer;
+
+//     // Calculate initial blockIndex and blockOffset based on file->position
+//     uint32_t blockIndex = file->position / FILESYSTEM_BLOCK_SIZE;
+//     uint32_t blockOffset = file->position % FILESYSTEM_BLOCK_SIZE;
+
+//     while (size > 0 && file->position < file->entry->size) {
+//         // Navigate through the FAT to find the correct block based on blockIndex
+//         uint32_t currentBlock = file->entry->start_block;
+//         // Print debug for current block
+//         printf("fs_read : Current block: %u\n", currentBlock);
+//         uint32_t nextBlock;
+//         int result;
+//         for (uint32_t i = 0; i < blockIndex; i++) {
+//             result = fat_get_next_block(currentBlock, &nextBlock);
+//             if (result == FAT_END_OF_CHAIN || result == FAT_CORRUPTED) {
+//                 printf("Error: Reached end of file chain or encountered corruption.\n");
+//                 fflush(stdout);
+//                 return -1; // Handle the error appropriately
+//             }
+//             currentBlock = nextBlock;
+//         }
+
+        
+//         if (currentBlock == FAT_ENTRY_END) {
+//             printf("Error: Reached end of file chain prematurely.\n");
+//             fflush(stdout);
+//             break; // Break the loop if the end of the chain is reached unexpectedly
+//         }
+
+//         // Calculate the number of bytes to read in this iteration
+//         int bytesToRead = min(size, FILESYSTEM_BLOCK_SIZE - blockOffset);
+//         bytesToRead = min(bytesToRead, (int)(file->entry->size - file->position));
+
+//         // Calculate the read offset for the current block
+//         uint32_t readOffset = currentBlock * FILESYSTEM_BLOCK_SIZE + blockOffset;
+//         printf("Performing read from block = %u, offset within block = %u (global readOffset = %u)\n", currentBlock, blockOffset, readOffset);
+//         fflush(stdout);
+
+//         // Perform the actual read operation
+//         flash_read_safe2(readOffset, buf + totalBytesRead, bytesToRead);
+
+//         // Update counters and positions for the next iteration
+//         totalBytesRead += bytesToRead;
+//         file->position += bytesToRead;
+//         size -= bytesToRead;
+
+//         // Reset blockOffset to 0 for subsequent blocks
+//         blockOffset = 0;
+
+//         // Move to the next block in the FAT chain, if needed
+//         if (bytesToRead + blockOffset >= FILESYSTEM_BLOCK_SIZE) {
+//             blockIndex++;
+//         }
+//     }
+
+//     // printf("Completed fs_read: totalBytesRead = %d, final file position = %u\n", totalBytesRead, file->position);
+//     // fflush(stdout);
+//     return totalBytesRead;
+// }
+   
+
 /**
  * Reads data from the specified file into the provided buffer.
  *
  * @param file   A pointer to the FS_FILE structure representing the file to read from.
- * @param buffer A pointer to the buffer where the read data should be stored.
- * @param size   The number of bytes to read.
+ * @param buffer A pointer to the buffer where the data will be stored.
+ * @param size   The maximum number of bytes to read.
  * @return The number of bytes actually read, or -1 if an error occurred.
  */
 int fs_read(FS_FILE* file, void* buffer, int size) {
-    if (file == NULL || buffer == NULL || size <= 0) {
-        printf("Error: Invalid parameters for fs_read.\n");
-        fflush(stdout);
-        return -1;
+    if (file == NULL || buffer == NULL) {
+        printf("Error: Null file or buffer pointer provided.\n");
+        return -1;  // Error due to invalid pointers
     }
 
-    if (file->mode != MODE_READ && file->mode != MODE_APPEND) {
-        printf("Error: File is not open in a readable mode.\n");
-        fflush(stdout);
-        return -1;
-    }
-    // printf("Starting fs_read: file position before read = %u, read size = %d\n", file->position, size);
-    // fflush(stdout);
-    int totalBytesRead = 0;
-    uint8_t* buf = (uint8_t*)buffer;
-
-    // Calculate initial blockIndex and blockOffset based on file->position
-    uint32_t blockIndex = file->position / FILESYSTEM_BLOCK_SIZE;
-    uint32_t blockOffset = file->position % FILESYSTEM_BLOCK_SIZE;
-
-    while (size > 0 && file->position < file->entry->size) {
-        // Navigate through the FAT to find the correct block based on blockIndex
-        uint32_t currentBlock = file->entry->start_block;
-        // Print debug for current block
-        printf("fs_read : Current block: %u\n", currentBlock);
-        uint32_t nextBlock;
-        int result;
-        for (uint32_t i = 0; i < blockIndex; i++) {
-            result = fat_get_next_block(currentBlock, &nextBlock);
-            if (result == FAT_END_OF_CHAIN || result == FAT_CORRUPTED) {
-                printf("Error: Reached end of file chain or encountered corruption.\n");
-                fflush(stdout);
-                return -1; // Handle the error appropriately
-            }
-            currentBlock = nextBlock;
-        }
-
-        
-        if (currentBlock == FAT_ENTRY_END) {
-            printf("Error: Reached end of file chain prematurely.\n");
-            fflush(stdout);
-            break; // Break the loop if the end of the chain is reached unexpectedly
-        }
-
-        // Calculate the number of bytes to read in this iteration
-        int bytesToRead = min(size, FILESYSTEM_BLOCK_SIZE - blockOffset);
-        bytesToRead = min(bytesToRead, (int)(file->entry->size - file->position));
-
-        // Calculate the read offset for the current block
-        uint32_t readOffset = currentBlock * FILESYSTEM_BLOCK_SIZE + blockOffset;
-        printf("Performing read from block = %u, offset within block = %u (global readOffset = %u)\n", currentBlock, blockOffset, readOffset);
-        fflush(stdout);
-
-        // Perform the actual read operation
-        flash_read_safe(readOffset, buf + totalBytesRead, bytesToRead);
-
-        // Update counters and positions for the next iteration
-        totalBytesRead += bytesToRead;
-        file->position += bytesToRead;
-        size -= bytesToRead;
-
-        // Reset blockOffset to 0 for subsequent blocks
-        blockOffset = 0;
-
-        // Move to the next block in the FAT chain, if needed
-        if (bytesToRead + blockOffset >= FILESYSTEM_BLOCK_SIZE) {
-            blockIndex++;
-        }
+    if (size <= 0) {
+        printf("Error: Invalid size to read (%d).\n", size);
+        return -1;  // Error due to non-positive size
     }
 
-    // printf("Completed fs_read: totalBytesRead = %d, final file position = %u\n", totalBytesRead, file->position);
-    // fflush(stdout);
-    return totalBytesRead;
-}
-
-/**
- * Writes data from the provided buffer to the specified file.
- *
- * @param file   A pointer to the FS_FILE structure representing the file to write to.
- * @param buffer A pointer to the buffer containing the data to write.
- * @param size   The number of bytes to write.
- * @return The number of bytes actually written, or -1 if an error occurred.
- */
-int fs_write(FS_FILE* file, const void* buffer, int size) {
-    if (file == NULL || buffer == NULL || size < 0) {
-        printf("Error: Invalid parameters for fs_write.\n");
-        fflush(stdout);
-        return -1;
+    if (file->mode != 'r' && file->mode != 'a') {
+        printf("Error: File is not open in a readable or append mode.\n");
+        return -1;  // Error due to incorrect mode
     }
 
-    if (file->mode != MODE_WRITE && file->mode != MODE_APPEND) {
-        printf("Error: File is not open in a write or append mode.\n");
-        fflush(stdout);
-        return -1;
+    int bytes_read = 0;  // Counter for the number of bytes actually read
+    int bytes_to_read = size;  // Adjust the size to not exceed the file size
+    char* char_buffer = (char*)buffer;  // Cast buffer to a char pointer for byte-wise manipulation
+
+    // Ensure we do not read past the end of the file
+    if (file->position + bytes_to_read > file->entry->size) {
+        bytes_to_read = file->entry->size - file->position;
     }
 
-    const uint8_t* buf = (const uint8_t*)buffer;
-    int totalBytesWritten = 0;
-    int bytesToWrite = size;
-    // printf("Starting fs_write: file position before write = %u, write size = %d\n", file->position, size);
-    // fflush(stdout);
-
-    uint32_t currentBlockIndex = file->position / FILESYSTEM_BLOCK_SIZE;
-    uint32_t blockOffset = file->position % FILESYSTEM_BLOCK_SIZE;
-    uint32_t physicalBlock = file->entry->start_block;
-    uint32_t nextBlock;
-    int result;
-
-    // Navigate to the current block based on the file position
-    for (uint32_t i = 0; i < currentBlockIndex; ++i) {
-        result = fat_get_next_block(physicalBlock, &nextBlock);
-        if (result != FAT_SUCCESS) {
-            printf("Error navigating FAT: Error code %d\n", result);
-            fflush(stdout);
-            return -1;
-        }
-        physicalBlock = nextBlock;
+    if (bytes_to_read <= 0) {  // Check if there's nothing to read
+        printf("No more data to read from file.\n");
+        return 0;  // No data read
     }
 
-    while (bytesToWrite > 0) {
-        uint32_t availableInBlock = FILESYSTEM_BLOCK_SIZE - blockOffset;
+    // Simulate the read operation (assuming the data starts right at the beginning of the buffer)
+    // Normally you'd perform actual storage read operations here.
+    memcpy(char_buffer, file->entry->buffer + file->position, bytes_to_read);
+    file->position += bytes_to_read;  // Update the position in the file
 
-        // Check if we need to allocate a new block
-        if (availableInBlock == 0 || physicalBlock == FAT_ENTRY_END) {
-            uint32_t newBlock = fat_allocate_block();
-            if (newBlock == FAT_NO_FREE_BLOCKS) {
-                printf("Error: No space left to allocate new block for writing.\n");
-                fflush(stdout);
-                return -1;
-            }
-            if (physicalBlock != FAT_ENTRY_END) {
-                fat_link_blocks(physicalBlock, newBlock);
-            } else {
-                // This case should be handled if we're appending to a new file
-                file->entry->start_block = newBlock;
-            }
-            physicalBlock = newBlock;
-            availableInBlock = FILESYSTEM_BLOCK_SIZE;
-            blockOffset = 0;
-        }
-
-        uint32_t writeSize = (bytesToWrite < availableInBlock) ? bytesToWrite : availableInBlock;
-        uint32_t writeOffset = physicalBlock * FILESYSTEM_BLOCK_SIZE + blockOffset;
-
-        flash_write_safe(writeOffset, buf + totalBytesWritten, writeSize);
-
-        totalBytesWritten += writeSize;
-        file->position += writeSize;
-        bytesToWrite -= writeSize;
-        blockOffset += writeSize; // Update blockOffset for next iteration
-
-        // Prepare for next iteration, possibly moving to the next block
-        if (blockOffset == FILESYSTEM_BLOCK_SIZE) {
-            blockOffset = 0; // Reset offset for next block
-            result = fat_get_next_block(physicalBlock, &nextBlock);
-            if (result == FAT_SUCCESS) {
-                physicalBlock = nextBlock; // Move to the next block in the chain
-            }
-            // Note: If result is not FAT_SUCCESS, it means we're at the end of the chain, which will trigger a new block allocation in the next loop iteration if needed.
-        }
-    }
-
-    // Update the file size in its directory entry if we've extended the file
-    if (file->position > file->entry->size) {
-        file->entry->size = file->position;
-        // printf("Updated file size: %u\n", file->entry->size);
-        fflush(stdout);
-    }
-
-    printf("Completed fs_write: totalBytesWritten = %d, final file position = %u\n", totalBytesWritten, file->position);
-    fflush(stdout);
-    return totalBytesWritten;
-}
-
-
-
-// int fs_write(FS_FILE* file, const void* buffer, int size) {
-//     if (file == NULL || buffer == NULL || size < 0) {
-//         return -1; // Error: Invalid parameters.
-//     }
-
-//     if (file->mode != MODE_WRITE && file->mode != MODE_APPEND) {
-//         return -1; // Error: File not open in a write or append mode.
-//     }
-
-//     const uint8_t* buf = (const uint8_t*)buffer;
-//     int totalBytesWritten = 0;
-//     int bytesToWrite = size;
-
-//     uint32_t currentBlock = file->entry->start_block;
-//     uint32_t blockOffset = file->position % FILESYSTEM_BLOCK_SIZE;
     
-//     // Ensure the file has an allocated start block if it's new or being appended to.
-//     if (currentBlock == FAT_NO_FREE_BLOCKS) {
-//         currentBlock = file->entry->start_block = fat_allocate_block();
-//         if (currentBlock == FAT_NO_FREE_BLOCKS) {
-//             return -1; // Error: Failed to allocate initial block for file.
-//         }
-//     }
 
-//     while (bytesToWrite > 0) {
-//         uint32_t writeSize = FILESYSTEM_BLOCK_SIZE - blockOffset;
-//         writeSize = (bytesToWrite < writeSize) ? bytesToWrite : writeSize;
-
-//         // Write the current chunk to flash memory.
-//         uint32_t writeOffset = currentBlock * FILESYSTEM_BLOCK_SIZE + blockOffset;
-//         flash_write_safe(writeOffset, buf + totalBytesWritten, writeSize);
-
-//         totalBytesWritten += writeSize;
-//         bytesToWrite -= writeSize;
-//         file->position += writeSize;
-
-//         // Check if we need to allocate and link a new block.
-//         if (bytesToWrite > 0) {
-//             uint32_t newBlock = fat_allocate_block();
-//             if (newBlock == FAT_NO_FREE_BLOCKS) {
-//                 return -1; // Error: No more blocks can be allocated.
-//             }
-
-//             fat_link_blocks(currentBlock, newBlock);
-//             currentBlock = newBlock;
-//             blockOffset = 0; // Reset offset for the new block.
-//         } else {
-//             blockOffset += writeSize;
-//         }
-//     }
-
-//     // Update the file size if it has been extended.
-//     if (file->position > file->entry->size) {
-//         file->entry->size = file->position;
-//     }
-
-//     return totalBytesWritten;
-// }
-
+    printf("Read %d bytes from file '%s'.\n", bytes_to_read, file->entry->filename);
+    return bytes_to_read;  // Return the number of bytes read
+}
 
 /**
  * Sets the file position indicator for the specified file.
  *
- * @param file   A pointer to the FS_FILE structure representing the file to seek in.
- * @param offset The number of bytes to offset from whence.
- * @param whence The reference point from which to offset (SEEK_SET, SEEK_CUR, SEEK_END).
- * @return 0 on success, or -1 if an error occurred.
+ * @param file A pointer to the FS_FILE structure representing the file.
+ * @param offset The number of bytes to offset from the specified position.
+ * @param whence The position from which to calculate the offset. 
+ *               Can be one of the following:
+ *               SEEK_SET - Sets the position relative to the beginning of the file.
+ *               SEEK_CUR - Sets the position relative to the current position.
+ *               SEEK_END - Sets the position relative to the end of the file.
+ * @return 0 if successful, or -1 if an error occurred (such as attempting to seek
+ *         to an invalid position or passing an invalid file pointer or whence value).
  */
 int fs_seek(FS_FILE* file, long offset, int whence) {
-    // Validate the file pointer
     if (file == NULL) {
-        printf("Error: Invalid file pointer provided to fs_seek.\n");
-        return -1;
+        printf("Error: Null file pointer provided.\n");
+        return -1;  // Error due to invalid file pointer
     }
 
-    // Calculate the new position based on the 'whence' parameter
-    long new_position;
+    long new_position;  // This will hold the computed new position based on the 'whence' and 'offset'
+
     switch (whence) {
         case SEEK_SET:
-            new_position = offset; // Set position relative to file start
+            // Position is set to 'offset' bytes from the start of the file.
+            new_position = offset;
             break;
         case SEEK_CUR:
-            new_position = file->position + offset; // Set position relative to current position
+            // Position changes by 'offset' bytes from the current position.
+            new_position = file->position + offset;
             break;
         case SEEK_END:
-            new_position = file->entry->size + offset; // Set position relative to file end
+            // Position is set to 'offset' bytes from the end of the file.
+            // If offset is negative, it positions backward from the end of the file.
+            new_position = file->entry->size + offset;
             break;
         default:
-            printf("Error: Invalid 'whence' argument provided to fs_seek (%d).\n", whence);
-            fflush(stdout);
-            return -1;
+            printf("Error: Invalid 'whence' argument (%d).\n", whence);
+            return -1; // Error due to invalid 'whence' value
     }
 
-    // Validate the new position
-    if (new_position < 0) {
-        printf("Error: Seek operation results in a negative file position (%ld).\n", new_position);
-        fflush(stdout);
-        return -1;
-    }
-    if (new_position > file->entry->size) {
-        // Optionally, allow seeking beyond the current file size for write/append operations
-        if (file->mode == MODE_WRITE || file->mode == MODE_APPEND) {
-            // Extend the file size if in write or append mode
-            printf("Notice: Seeking beyond the current file size. File will be extended.\n");
-            fflush(stdout);
-            file->entry->size = new_position;
-        } else {
-            printf("Error: Seek operation results in a position beyond the end of the file (%ld).\n", new_position);
-            fflush(stdout);
-            return -1;
-        }
+    // Validate the new position to ensure it is within the valid range of the file.
+    if (new_position < 0 || new_position > file->entry->size) {
+        printf("Error: Attempted to seek to an invalid position (%ld).\n", new_position);
+        return -1; // The new position is out of bounds
     }
 
-    // Set the new file position
+    // Successfully set the new position
     file->position = new_position;
-    return 0; // Indicate success
-}
-
-
-////////////////////////////////////// 
+    return 0; // Success indicates the new position was set without issues
+}////////////////////////////// 
  
 int fs_mv(const char* old_path, const char* new_path) {
     // Validate input paths
@@ -1041,6 +1069,7 @@ FileEntry* list_all_files(size_t *count) {
 
 
 FileEntry* FILE_find_file_entry(const char* filename) {
+    const char* newfilename = prepend_slash(filename);
     printf("\n\nENTERED FILE_find_file_entry\n");
     fflush(stdout);
 
@@ -1058,10 +1087,11 @@ FileEntry* FILE_find_file_entry(const char* filename) {
             printf("Checking file start block: %u\n", fileEntry.start_block);
             printf("Checking file in_use: %d\n", fileEntry.in_use);
             printf("Checking if directory flag: %d\n", fileEntry.is_directory);
+            printf("buffer: %s\n", fileEntry.buffer);
             fflush(stdout);
             
-            if (fileEntry.in_use && !fileEntry.is_directory && strcmp(fileEntry.filename, filename) == 0) {
-                printf("File entry found: %s\n", filename);
+            if (fileEntry.in_use && !fileEntry.is_directory && strcmp(fileEntry.filename, newfilename) == 0) {
+                printf("File entry found: %s\n", newfilename);
                 fflush(stdout);
                 FileEntry* result = malloc(sizeof(FileEntry));  // Dynamically allocate memory
                 if (result) {

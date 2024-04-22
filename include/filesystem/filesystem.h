@@ -26,18 +26,20 @@ typedef struct {
     bool in_use;        // Indicates if this file entry is in use
     uint32_t start_block; // Offset in flash memory where the file data starts
     bool is_directory;      // Flag to indicate if this entry is a
+    uint8_t buffer[256];
 } FileEntry;
 
 // File handle structure
 typedef struct {
     FileEntry *entry;   // Pointer to the file entry in the file system
     uint32_t position;  // Current position in the file
-    FileMode mode; 
+    // FileMode mode; 
+    char mode;
 } FS_FILE;
 
 extern FileEntry fileSystem[MAX_FILES];
 
-
+ 
 FS_FILE* fs_open(const char* path, const char* mode);
 void fs_close(FS_FILE* file);
 int fs_read(FS_FILE* file, void* buffer, int size);
