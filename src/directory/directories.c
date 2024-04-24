@@ -165,9 +165,11 @@ bool initialize_directory_block(uint32_t block_number) {
         printf("END process_directory_operation(const char* path)\n");
     }
     // Process file creation if the final part is determined to be a file
+    printf("fileName   %s\n", fileName);
     if (finalPartIsFile) {
         char fullPathConstructed[512];
         sprintf(fullPathConstructed, "%s/%s", directoryPath, fileName); // Construct the full path for the file
+        printf("fullPathConstructed: %s\n", fullPathConstructed);
         FS_FILE* file = process_file_creation(fullPathConstructed); // Call to check or create the file
         return file; // Return the file pointer
     }
@@ -387,7 +389,7 @@ bool reset_root_directory(void) {
     // dirEntries[0].size = 0; // Optionally set the directory size to 0 or an appropriate value
 
     const char* NamePath = "/root";
-    uint32_t parentDirIdHHolder = rootBlock * FILESYSTEM_BLOCK_SIZE;
+    uint32_t parentDirIdHHolder = generateUniqueId();
 
 
     freeEntry->is_directory = true;
@@ -442,7 +444,7 @@ bool actual_create_directory(const char* path, uint32_t pathToParent) {
     }
     printf("DEBUG: Entering actual_create_directory: 5\n");
     // uint32_t parentDirId;    
-    uint32_t parentDirIdHHolder = directoryBlock * FILESYSTEM_BLOCK_SIZE;    
+    uint32_t parentDirIdHHolder = generateUniqueId();  
     // Initialize the new directory entry within the filesystem's directory entry structure
     freeEntry->is_directory = true;
     strncpy(freeEntry->name, path, sizeof(freeEntry->name) - 1); // Copy directory name

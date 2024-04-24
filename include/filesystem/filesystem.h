@@ -27,6 +27,7 @@ typedef struct {
     uint32_t start_block; // Offset in flash memory where the file data starts
     bool is_directory;      // Flag to indicate if this entry is a
     uint8_t buffer[256];
+    uint32_t unique_file_id; 
 } FileEntry;
 
 // File handle structure
@@ -61,9 +62,17 @@ FileEntry* list_all_files(size_t *count);
  
  
  
- 
+ int check_full_file_existance(const char* fullPath);
+ void split_path_fs_copy(const char* fullPath, char* directoryPath, char* fileName);
+  int fs_cp(const char* source_path, const char* dest_path) ;
  
 //int fs_rm(const char* path);
+
+
+// to be deleted:
+FS_FILE* fs_open_for_coppy(const char* FullPath, const char* mode);
+FileEntry* fs_cp_create_new_file_entry(const char* path);
+
 
 #endif // FILESYSTEM_H
 

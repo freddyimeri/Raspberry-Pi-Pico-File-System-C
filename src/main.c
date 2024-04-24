@@ -18,7 +18,7 @@ int main() {
         sleep_ms(100);
     }
     
-    for (int i = 5; i >= 1; i--) {
+    for (int i = 15; i >= 1; i--) {
         printf("Operation starts in: %d Seconds\n", i);
         fflush(stdout);
         sleep_ms(1000);
@@ -30,7 +30,7 @@ int main() {
 
 
       // Define paths for the directory and the file
-     const char* filePath = "myFile.txt";
+     const char* filePath = "/dir/another/myFile.txt";
     const char* content = "Hello, Raspberry Pi Pico!";
     // this is for append 
      const char* content2 = " hhhhhhhhhhhhhhhhh";
@@ -49,51 +49,51 @@ int main() {
 
     }
 
-     printf("FINISH opening the file path\n");  
-    sleep_ms(1000);
-    // Write some content to the file
-    printf("Writing to file '%s'...\n", filePath);
-    fflush(stdout);
+    //  printf("FINISH opening the file path\n");  
+    // sleep_ms(1000);
+    // // Write some content to the file
+    // printf("Writing to file '%s'...\n", filePath);
+    // fflush(stdout);
 
  
-    int s = fs_write(file, content, strlen(content));
-    printf("s: %d\n", s);
+    // int s = fs_write(file, content, strlen(content));
+    // printf("s: %d\n", s);
 
-    fs_close(file);
+    // fs_close(file);
    
-    printf("FINISH  Writing to file '%s'...\n", filePath);
-     fflush(stdout);
+    // printf("FINISH  Writing to file '%s'...\n", filePath);
+    //  fflush(stdout);
 
 
-    FS_FILE* fileHandle = fs_open(filePath, "a");
+    // FS_FILE* fileHandle = fs_open(filePath, "a");
   
 
-    if (fileHandle) {
-        printf("File '%s' opened successfully.\n", filePath);
-    } else {
-        printf("Failed to open file '%s'.\n", filePath);
-    }
-    sleep_ms(1000);
-    int p = fs_write(fileHandle, content2, strlen(content2));
-    printf("s: %d\n", p);
+    // if (fileHandle) {
+    //     printf("File '%s' opened successfully.\n", filePath);
+    // } else {
+    //     printf("Failed to open file '%s'.\n", filePath);
+    // }
+    // sleep_ms(1000);
+    // int p = fs_write(fileHandle, content2, strlen(content2));
+    // printf("s: %d\n", p);
 
-    fs_close(fileHandle);
+    // fs_close(fileHandle);
 
     
     //////////////////////////////////////////////////////
-    FS_FILE* fileHandle1 = fs_open(filePath, "r");
+    // FS_FILE* fileHandle1 = fs_open(filePath, "r");
 
 
-    char read_buffer[256];  // Buffer to hold read data
-    memset(read_buffer, 0, sizeof(read_buffer));  // Clear the buffer
+    // char read_buffer[256];  // Buffer to hold read data
+    // memset(read_buffer, 0, sizeof(read_buffer));  // Clear the buffer
 
-    // Read data from the file
-    int read_bytes = fs_read(fileHandle1, read_buffer, sizeof(read_buffer));
-    if (read_bytes > 0) {
-        printf("Successfully read %d bytes: %s\n", read_bytes, read_buffer);
-    } else {
-        printf("Failed to read from file or no data left.\n");
-    }
+    // // Read data from the file
+    // int read_bytes = fs_read(fileHandle1, read_buffer, sizeof(read_buffer));
+    // if (read_bytes > 0) {
+    //     printf("Successfully read %d bytes: %s\n", read_bytes, read_buffer);
+    // } else {
+    //     printf("Failed to read from file or no data left.\n");
+    // }
 
 
 
@@ -127,19 +127,82 @@ int main() {
     // sleep_ms(1000);
     // DIR_all_directory_entries();
     // printf("FINISH LISTING ALL DIRECTORIES\n");
-    printf("\n\nSTART LISTING ALL FILES\n");
+    ///////////////////////////////////////////
+    // printf("\n\n\nSTART COPY FILES\n");
+    // int cpResult = fs_cp("/dir/another/myFile.txt", "/dir/another/myFile.txt");
+    // if (cpResult == 0) {
+    //     printf("File copied successfully.\n");
+    // } else {
+    //     printf("Failed to copy file.\n");
+    // }
+
+
+    // printf("\nFINISH COPY FILES\n\n");
+
+
+
+    // printf("\n\n\nSTART MOVING FILES\n");
+    // int cpResult = fs_mv("/dir/another/myFile.txt", "/dir/myFile.txt");
+    // if (cpResult == 0) {
+    //     printf("File MOVED successfully.\n");
+    // } else {
+    //     printf("Failed to MOVED file.\n");
+    // }
+
+
+    // printf("\nFINISH MOVING FILES\n\n");
+
+
+//"/dir/another/myFile.txt"fs_mv
+
+    /////////////////////////////////////
+    printf("\n\nSTART LISTING myFile.txt\n");
     FileEntry* entryTEST = FILE_find_file_entry("myFile.txt");
-    printf("\nFINISH LISTING ALL FILES\n");
-    printf("File Name: %s\n", entryTEST->filename);
-    printf("File Size: %d\n", entryTEST->size);
-    printf("File Start Block: %d\n", entryTEST->start_block);
-    printf("File Parent Directory ID: %d\n", entryTEST->parentDirId);
-    printf("File In Use: %d\n", entryTEST->in_use);
-    printf("File is Directory: %d\n", entryTEST->is_directory);
-    printf("File Buffer: %s\n", entryTEST->buffer);
-    printf("\n\n");
-    fflush(stdout);
-    
+    if (entryTEST == NULL) {
+        printf("File not found.\n");
+        fflush(stdout);
+    }else{
+        printf("File found.\n");
+        printf("\nFINISH LISTING ALL FILES\n");
+        printf("File Name: %s\n", entryTEST->filename);
+        printf("File Size: %d\n", entryTEST->size);
+        printf("File Start Block: %d\n", entryTEST->start_block);
+        printf("File Parent Directory ID: %d\n", entryTEST->parentDirId);
+        printf("File In Use: %d\n", entryTEST->in_use);
+        printf("File is Directory: %d\n", entryTEST->is_directory);
+        printf("File Buffer: %s\n", entryTEST->buffer);
+        printf("\n\n");
+        fflush(stdout);
+    }
+
+    printf("\n\nSTART WIPING FILE myFile.txt\n");
+    int wipeResult = fs_wipe("myFile.txt");
+    if (wipeResult == 0) {
+        printf("File wiped successfully.\n");
+    } else {
+        printf("Failed to wipe file.\n");
+        printf("wipeResult: %d\n", wipeResult);
+    }
+
+//////////////////////////////////////////////////////////////////
+    printf("\n\nSTART LISTING myFile.txt\n");
+    FileEntry* entryTEST1 = FILE_find_file_entry("myFile.txt");
+    if (entryTEST1 == NULL) {
+        printf("File not found.\n");
+        fflush(stdout);
+    }else{
+        printf("File found.\n");
+        printf("\nFINISH LISTING ALL FILES\n");
+        printf("File Name: %s\n", entryTEST1->filename);
+        printf("File Size: %d\n", entryTEST1->size);
+        printf("File Start Block: %d\n", entryTEST1->start_block);
+        printf("File Parent Directory ID: %d\n", entryTEST1->parentDirId);
+        printf("File In Use: %d\n", entryTEST1->in_use);
+        printf("File is Directory: %d\n", entryTEST1->is_directory);
+        printf("File Buffer: %s\n", entryTEST1->buffer);
+        printf("\n\n");
+        fflush(stdout);
+    }
 
     
     printf("Operation Completed.\n\n\n");
@@ -158,3 +221,20 @@ int main() {
 
 
  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

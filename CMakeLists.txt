@@ -30,4 +30,4 @@ pico_enable_stdio_uart(my_blink 0)
 
 pico_add_extra_outputs(my_blink)
 
-target_link_libraries(my_blink pico_stdlib )
+target_link_libraries(my_blink pico_stdlib hardware_adc)
