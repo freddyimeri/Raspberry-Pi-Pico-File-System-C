@@ -18,10 +18,23 @@ typedef struct PathSegments {
 // Define a structure to hold the parsed directory and file name
 
 
-void process_directory_operation(const char* path);
+ 
+DirectoryEntry* createDirectoryEntry(const char* path);
 
-PathSegments extract_path_segments(const char* fullPath);
-void free_path_segments(PathSegments* pathSegments);
-bool has_file_extension(const char* segment);
 
+
+uint32_t get_root_directory_id();
+
+
+bool is_directory_valid(const DirectoryEntry* directoryEntry);
+
+
+DirectoryEntry* DIR_find_directory_entry(const char* directoryName);
+DirectoryEntry* find_directory_entry(const char* path); // been used once in directories.c fs_create_directory
+
+DirectoryEntry* find_free_directory_entry(void);
+void DIR_all_directory_entries(void);
+
+
+ 
 #endif // FILESYSTEM_HELPER_H

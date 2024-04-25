@@ -6,16 +6,13 @@
 #include "hardware/flash.h"
 #include "pico/mutex.h"
 #include <ctype.h>
- 
 #include "../config/flash_config.h"    
 #include "../FAT/fat_fs.h"            
 #include "../flash/flash_ops.h"       
 #include "../filesystem/filesystem.h"  
 #include "../directory/directories.h"
  #include "../filesystem/filesystem_helper.h"  
-
- 
-
+#include "../directory/directory_helpers.h"
 
 #ifndef min
 #define min(a,b) ((a) < (b) ? (a) : (b))
@@ -27,57 +24,20 @@
 #define SEEK_CUR 1  // Current position in the file
 #define SEEK_END 2  // End of the file
 ////////////////////////
-
+// 1589 LINES 
  
 bool fs_initialized = false;
 static mutex_t filesystem_mutex;
-bool isValidChar(char c);
-bool isValidPath(const char* path);
-
 FileEntry fileSystem[MAX_FILES];
- 
- 
- 
-
-void reset_file_content(FileEntry* entry);
-FileMode determine_mode(const char* mode);
 
 
-
+bool isValidChar(char c);
 bool isValidChar(char c) {
     return isalnum(c) || c == '_' || c == '-' || c == '/';
 }
 
-// Validates the path format and characters
-bool isValidPath(const char* path) {
-    // Path must start with a "/" character
-    if (path[0] != '/') {
-        printf("Error: Path must start with '/'.\n");
-        return false;
-    }
+ 
 
-    // Check each character in the path
-    for (int i = 1; path[i] != '\0'; i++) {
-        if (!isValidChar(path[i])) {
-            printf("Error: Invalid character '%c' in path.\n", path[i]);
-            return false;
-        }
-
-        // Additional checks can be added here, such as:
-        // - Disallowing consecutive slashes
-        // - Limiting the total length of the path
-        // - Limiting the depth of directories
-
-        // Example: disallow consecutive slashes
-        if (path[i] == '/' && path[i-1] == '/') {
-            printf("Error: Consecutive slashes are not allowed.\n");
-            return false;
-        }
-    }
-
-    // Path is considered valid
-    return true;
-}
 
 
 /**
@@ -128,398 +88,232 @@ void fs_init() {
     }
     fs_initialized = true;
     printf("Filesystem initialized.\n");
-
-    
     
 }
 
-
- 
+/**
+ * Opens a file with the specified mode.
+ * 
+ * @param FullPath The full path to the file.
+ * @param mode The mode to open the file in ('r' for read, 'w' for write, 'a' for append).
+ * @return A pointer to an FS_FILE structure if successful, NULL otherwise.
+ */
 FS_FILE* fs_open(const char* FullPath, const char* mode) {
-
-     if (FullPath == NULL || mode == NULL) {
+    // Validate input parameters.
+    if (FullPath == NULL || mode == NULL) {
         printf("Error: Path or mode is NULL.\n");
         fflush(stdout);
         return NULL;
     }
 
-     if (strcmp(mode, "a") == 0) 
-    {
-        printf("Opening file '%s' in append mode.\n", FullPath);
-        const char* path = prepend_slash(FullPath);
-        
-        printf("Path: %s\n", path);
-        FileEntry* entry = FILE_find_file_entry(path);
-        
-        
-        // int len = strlen(entry->buffer);
-        int len = entry->size;  // Assuming size is maintained correctly
-        printf("len: %d\n", len);
-
-
-        if (entry == NULL) {
-        printf("Error: File '%s' not found for reading.\n", FullPath);
+    // Ensure the path starts with a slash for consistency.
+    const char* path = prepend_slash(FullPath);
+    if (path == NULL) {
+        printf("Error: Failed to process path '%s'.\n", FullPath);
+        fflush(stdout);
         return NULL;
-        }
-
-
-            // Create and initialize the FS_FILE structure
-        FS_FILE* file = (FS_FILE*)malloc(sizeof(FS_FILE));
-        if (file == NULL) {
-            printf("Error: Memory allocation failed for FS_FILE.\n");
-            fflush(stdout);
-            return NULL;
-        }
-
-        file->entry = entry;
-        file->position = file->position + len; // Append mode sets position to the end
-        file->mode = 'a';  // Simplified mode determination
-        // strcpy(file->mode, "a"); 
-        
-
-    
-        return file;
-
     }
-   
 
-    if (strcmp(mode, "r") == 0) 
-    {
-        printf("Opening file '%s' in read mode.\n", FullPath);
-        const char* path = prepend_slash(FullPath);
-        
-        printf("Path: %s\n", path);
-        FileEntry* entry = FILE_find_file_entry(path);
+    // Attempt to find the file entry in the filesystem.
+    FileEntry* entry = FILE_find_file_entry(path);
 
-
-        if (entry == NULL) {
-        printf("Error: File '%s' not found for reading.\n", FullPath);
+    // Allocate memory for the FS_FILE structure.
+    FS_FILE* file = (FS_FILE*)malloc(sizeof(FS_FILE));
+    if (!file) {
+        printf("Error: Memory allocation failed for FS_FILE.\n");
+        fflush(stdout);
         return NULL;
-        }
-
-
-            // Create and initialize the FS_FILE structure
-        FS_FILE* file = (FS_FILE*)malloc(sizeof(FS_FILE));
-        if (file == NULL) {
-            printf("Error: Memory allocation failed for FS_FILE.\n");
-            fflush(stdout);
-            return NULL;
-        }
-
-        file->entry = entry;
-        file->position = 0; // Append mode sets position to the end
-        file->mode = 'r'; // Simplified mode determination
-        // strcpy(file->mode, "r"); 
-  
-
-    
-        return file;
-
     }
-   
 
-
+    // Handle different modes of file operation.
     if (strcmp(mode, "w") == 0) {
-
+        // Write mode: reset or create file.
         printf("Opening file '%s' in write mode.\n", FullPath);
-        PathParts parts = extract_last_two_parts(FullPath);
-        const char* path = prepend_slash(parts.filename);
-        const char* directoryName = parts.directory;
-        if (path != NULL) {
-        printf("Modified Path: %s\n", path);
+        if (entry != NULL) {
+            reset_file_content(entry);  // If the file exists, reset its content.
         } else {
-            printf("Failed to modify the path.\n");
-        }
-
-        if (directoryName[0] == '\0') {
-            directoryName = "/root";  // Default to the root directory
-            printf("No directory specified, defaulting to root: %s\n", directoryName);
-        }
-
-        FileEntry* entry = FILE_find_file_entry(path);
-        bool isNewFileCreation = (entry == NULL) && (strchr("wa", mode[0]) != NULL);
- 
-         DirectoryEntry* dirEntry = DIR_find_directory_entry(directoryName);
-        
-        uint32_t parentID;
-        if (dirEntry) {
-            parentID = dirEntry->currentDirId;
-            // If the directory is found, access its parentDirId and other details
-            printf("Directory '%s' found with ParentDirId: %u\n", directoryName, dirEntry->currentDirId);
-            free(dirEntry);
-        } else {
-            // If the directory is not found, handle this case
-            printf("EROR: Directory '%s' not found.\n", directoryName);
-        }
-        printf("code 3\n");
-        // Attempt to create a new file entry if the file does not exist and the mode allows for writing or appending
-        if (isNewFileCreation) {
-            entry = create_new_file_entry(path, parentID);
+            // If the file does not exist, create a new file entry.
+            entry = createFileEntry(path);
             if (entry == NULL) {
-                return NULL; // Error message is handled in create_new_file_entry
-            }
-        } else if (entry == NULL) {
-            printf("Error: File not found for reading.\n");
-            fflush(stdout);
-            return NULL;
-        }
-        printf("code 4\n");
-        // Special handling for 'w' mode: reset the file if it exists
-
-
-        // reset_file_content(entry);
-        uint32_t offsetInBytes;
-        const uint32_t offsetFromEntry = entry->start_block;
-        printf("offsetFromEntry dd: %u\n", offsetFromEntry);
-        //print the fileName 
-        offsetInBytes =  offsetFromEntry * FILESYSTEM_BLOCK_SIZE;
-        printf("offsetInBytes dd: %u\n", offsetInBytes);
-        flash_write_safe2(offsetInBytes, (const uint8_t*)entry, sizeof(FileEntry));
-
-            // Create and initialize the FS_FILE structure
-        FS_FILE* file = (FS_FILE*)malloc(sizeof(FS_FILE));
-        if (file == NULL) {
-            printf("Error: Memory allocation failed for FS_FILE.\n");
-            fflush(stdout);
-            return NULL;
-        }
-
-        file->entry = entry;
-        file->position = 0 ;  
-        // strcpy(file->mode, "w"); // Simplified mode determination
-        file->mode = 'w'; // Simplified mode determination
-
- 
-    return file;
- 
-
-    }
-   
-    return NULL;
-}
-
-
-
-
-// Function to PRINT write data to a file
-int fs_write(FS_FILE* file, const void* buffer, int size) {
-
-    char tempFileName[256];  
-
-    if (strlen(file->entry->filename) < sizeof(tempFileName)) {
-        strcpy(tempFileName, file->entry->filename);  // Copy the filename
-        printf("Filename copied: %s\n", tempFileName);
-    } else {
-        printf("Filename too long to fit in tempFileName\n");
-    }
-
-    uint32_t numbs = find_file_entry_by_name(tempFileName);
-    printf("numbs: %d\n", numbs);
-
-    
-    printf("file->mode ss: %c\n", file->mode);
-    if (file->mode == 'a') {  
-        printf("Append mode fs_write\n");
-        // Copy the existing file content to a temporary buffer
-        char tempBuffer[256];
-        strcpy(tempBuffer, fileSystem[numbs].buffer);
-        printf("tempBuffer: %s\n", tempBuffer);
-        // Append the new data to the temporary buffer
-        strncat(tempBuffer, buffer, size);
-        printf("tempBuffer: %s\n", tempBuffer);
-        // Copy the updated content back to the file entry buffer
-        strcpy(fileSystem[numbs].buffer, tempBuffer);
-        printf("fileSystem[numbs].buffer: %s\n", fileSystem[numbs].buffer);
-
-        ////
-        // ADD The int size to the fileSystem[numbs].size 
-        fileSystem[numbs].size += size;
-     
-    } else {
-           printf("NON Append mode fs_write\n");
-        // Copy the new data directly to the file entry buffer
-        strcpy(fileSystem[numbs].buffer, buffer); 
-    }
-
-    
-
-    uint32_t writeOffset = (fileSystem[numbs].start_block * FILESYSTEM_BLOCK_SIZE);
-    
-    // Perform the write operation
-    // flash_write_safe2(writeOffset, (const uint8_t*)buffer, size);
-    printf("start debug fs_write\n");
-    printf("fileSystem[numbs]->buffer: %s\n", fileSystem[numbs].buffer);
-    printf("fileSystem[numbs]>filename: %s\n", fileSystem[numbs].filename);
-    printf("fileSystem[numbs]>size: %u\n", fileSystem[numbs].size);
-    printf("fileSystem[numbs]->start_block: %u\n", fileSystem[numbs].start_block);
-    printf("fileSystem[numbs]>parentDirId: %u\n", fileSystem[numbs].parentDirId);
-    printf("fileSystem[numbs]>is_directory: %d\n", fileSystem[numbs].is_directory);
-    printf("fileSystem[numbs]>in_use: %d\n", fileSystem[numbs].in_use);
-    printf("writeOffset: %u\n", writeOffset);
-    fflush(stdout);
-    printf("finish debug fs_write\n\n");
-
-
-    flash_write_safe2(writeOffset, (const uint8_t*)&fileSystem[numbs], sizeof(FileEntry));
-
-    // flash_write_safe2(writeOffset, (const uint8_t*)fileSystem[numbs], sizeof(fileSystem[numbs]));
-    printf("Data written to file fffffffffffffffffff.\n");
-    // Update file position
-    file->position += size;
-
-    return size;  // Return the number of bytes written
-}
- 
- 
-
-FileEntry* create_new_file_entry(const char* path, uint32_t parentID) {
-    printf("debug create_new_file_entry for path: %s\n", path);
-    for (int i = 0; i < MAX_FILES; i++) {
-        if (!fileSystem[i].in_use) {
-            strncpy(fileSystem[i].filename, path, sizeof(fileSystem[i].filename) - 1);
-            fileSystem[i].filename[sizeof(fileSystem[i].filename) - 1] = '\0';
-            fileSystem[i].in_use = true;
-            fileSystem[i].is_directory = false; // Default to file
-            fileSystem[i].size = 0;
-            fileSystem[i].start_block = fat_allocate_block();
-            fileSystem[i].parentDirId = parentID; 
-            fileSystem[i].unique_file_id = generateUniqueId();
-
-            printf("New file created: %s\n", fileSystem[i].filename);
-            printf("Start block: %u\n", fileSystem[i].start_block);
-            printf("File size: %u\n", fileSystem[i].size);
-            printf("Filesystem entry index: %d\n", i);
-            printf("Parent Directory ID: %u\n", fileSystem[i].parentDirId);
-            
-            fflush(stdout);
-            if (fileSystem[i].start_block == FAT_NO_FREE_BLOCKS) {
-                printf("Error: No space left on device to create new file.\n");
+                free(file); // Free allocated FS_FILE structure on error.
+                printf("Error: Failed to create file entry for '%s'.\n", FullPath);
                 fflush(stdout);
-                memset(&fileSystem[i], 0, sizeof(FileEntry)); // Cleanup
-                fileSystem[i].in_use = false; // Explicitly mark it as not in use
                 return NULL;
             }
-            return &fileSystem[i];
         }
-    }
-    printf("Error: Filesystem is full, cannot create new file.\n");
-    fflush(stdout);
-    return NULL;
-}
+        // Calculate the flash storage offset based on the file's start block.
+        uint32_t offsetInBytes = entry->start_block * FILESYSTEM_BLOCK_SIZE;
+        // Write the initial file entry to flash.
+        flash_write_safe2(offsetInBytes, (const uint8_t*)entry, sizeof(FileEntry));
+        file->entry = entry;
+        file->position = 0;  // Start at the beginning of the file for writing.
+        file->mode = 'w';
 
- 
-
-void reset_file_content(FileEntry* entry) {
-    uint32_t block = entry->start_block;
-    uint32_t nextBlock;
-    int result;
-
-    // Continue looping until we reach the end of the file's block chain
-    while (block != FAT_ENTRY_END && block < TOTAL_BLOCKS) {
-        result = fat_get_next_block(block, &nextBlock);
-        // Free the current block before moving to the next
-        fat_free_block(block);
-
-        // If we encounter an error or the end of the chain, stop processing
-        if (result != FAT_SUCCESS || nextBlock == FAT_ENTRY_END || nextBlock >= TOTAL_BLOCKS) {
-            break; // Exit the loop if an error occurs or the end of the chain is reached
+    } else if (strcmp(mode, "a") == 0) {
+        // Append mode: file must exist.
+        if (entry == NULL) {
+            printf("Error: File '%s' not found.\n", FullPath);
+            fflush(stdout);
+            free(file); // Ensure allocated memory is freed on error.
+            return NULL;
         }
+        printf("Opening file '%s' in append mode.\n", FullPath);
+        file->entry = entry;
+        file->position = entry->size;  // Set the position to the end of the file to append.
+        file->mode = 'a';
 
-        block = nextBlock; // Move to the next block in the chain
-    }
+    } else if (strcmp(mode, "r") == 0) {
+        // Read mode: file must exist.
+        if (entry == NULL) {
+            printf("Error: File '%s' not found.\n", FullPath);
+            fflush(stdout);
+            free(file); // Ensure allocated memory is freed on error.
+            return NULL;
+        }
+        printf("Opening file '%s' in read mode.\n", FullPath);
+        file->entry = entry;
+        file->position = 0;  // Start reading from the beginning of the file.
+        file->mode = 'r';
 
-    // Allocate a new start block for the file and reset its size
-    entry->start_block = fat_allocate_block();
-    entry->size = 0;
-    if (entry->start_block == FAT_NO_FREE_BLOCKS) {
-        printf("Error: Unable to allocate a new block for the file.\n");
+    } else {
+        // Handle invalid mode.
+        free(file);
+        printf("Error: Invalid mode '%s'.\n", mode);
         fflush(stdout);
-        // Additional error handling could be implemented here if necessary
+        return NULL;
     }
-    printf("File content reset successfully.\n");
-    fflush(stdout);
-    printf("New start block: %u\n", entry->start_block);
-    fflush(stdout);
-    printf("New file size: %u\n", entry->size);
-    fflush(stdout);
-    printf("File content reset successfully.\n");
+
+    // Return the prepared FS_FILE structure.
+    return file;
 }
 
 
-FileMode determine_mode(const char* mode) {
-    if (strcmp(mode, "r") == 0) return MODE_READ;
-    if (strcmp(mode, "w") == 0) return MODE_WRITE;
-    if (strcmp(mode, "a") == 0) return MODE_APPEND;
-    printf("Error: Unrecognized file mode '%s'. Defaulting to read mode.\n", mode);
-    fflush(stdout);
-    return MODE_READ; // Default to read if mode is unrecognized
+
+/**
+ * Writes data to a file.
+ *
+ * @param file The FS_FILE pointer representing the file to write to.
+ * @param buffer The buffer containing data to write to the file.
+ * @param size The number of bytes to write.
+ * @return The number of bytes actually written, or -1 if an error occurs.
+ */
+int fs_write(FS_FILE* file, const void* buffer, int size) {
+    // Validate the inputs for null pointers and ensure size is non-negative.
+    if (file == NULL || buffer == NULL || size < 0) {
+        printf("Error: Invalid arguments for fs_write.\n");
+        return -1; // Error code for invalid arguments.
+    }
+
+    // Check if the file is opened in a mode that allows writing.
+    if (file->mode != 'a' && file->mode != 'w') {
+        printf("Error: File not open in a writable or appendable mode.\n");
+        return -1; // Error code for incorrect mode.
+    }
+
+    int writeSize = size;
+    // Adjust the write size based on the file's mode and capacity.
+    if (file->mode == 'a') {
+        // Calculate maximum size that can be appended without overflowing the buffer.
+        writeSize = min(size, sizeof(file->entry->buffer) - file->entry->size);
+        if (writeSize < size) {
+            printf("Warning: Truncating write size because of buffer limit.\n");
+        }
+        // Append data to the end of the existing content in the buffer.
+        memcpy(file->entry->buffer + file->entry->size, buffer, writeSize);
+        file->entry->size += writeSize; // Update the file size.
+    } else if (file->mode == 'w') {
+        // Overwrite data from the start of the buffer.
+        memcpy(file->entry->buffer, buffer, min(size, sizeof(file->entry->buffer)));
+        file->entry->size = writeSize; // Reset the file size to the write size.
+    }
+
+    // Update the file's position.
+    file->position += writeSize;
+
+    // Calculate the flash memory offset where the file's data starts.
+    uint32_t writeOffset = file->entry->start_block * FILESYSTEM_BLOCK_SIZE;
+    // Write the updated file entry back to the flash memory.
+    flash_write_safe2(writeOffset, (const uint8_t*)file->entry, sizeof(FileEntry));
+
+    // Display the number of bytes written to the file.
+    printf("fs_write: %d bytes written.\n", writeSize);
+    return writeSize; // Return the number of bytes successfully written.
 }
 
 
 
 /**
  * Closes the specified file.
+ * 
+ * This function handles the cleanup and release of resources associated with an open file.
+ * It is responsible for freeing the memory allocated to the FS_FILE structure.
  *
- * @param file A pointer to the file to be closed.
+ * @param file A pointer to the FS_FILE structure representing the file to be closed.
  */
 void fs_close(FS_FILE* file) {
+    // Check if the file pointer is valid before attempting to close.
     if (file == NULL) {
+        // Print an error message and exit the function if the file pointer is NULL.
         printf("Error: Attempted to close a NULL file pointer.\n");
         fflush(stdout);
         return;
     }
 
+    // Free the memory allocated for the FS_FILE structure.
+    // This is important to prevent memory leaks.
     free(file);
 }
 
- 
-/**
+
+ /**
  * Reads data from the specified file into the provided buffer.
+ *
+ * This function attempts to read up to 'size' bytes from the file associated with 'file' into 'buffer'.
+ * It handles various edge cases such as null pointers, invalid read sizes, and incorrect file modes.
  *
  * @param file   A pointer to the FS_FILE structure representing the file to read from.
  * @param buffer A pointer to the buffer where the data will be stored.
  * @param size   The maximum number of bytes to read.
- * @return The number of bytes actually read, or -1 if an error occurred.
+ * @return The number of bytes actually read, or a negative error code if an error occurred.
  */
 int fs_read(FS_FILE* file, void* buffer, int size) {
+    // Validate the file and buffer pointers to ensure they are not NULL.
     if (file == NULL || buffer == NULL) {
         printf("Error: Null file or buffer pointer provided.\n");
-        return -1;  // Error due to invalid pointers
+        return -1;  // Use a defined error code in practice.
     }
 
+    // Validate the request size to ensure it's positive.
     if (size <= 0) {
         printf("Error: Invalid size to read (%d).\n", size);
-        return -1;  // Error due to non-positive size
+        return -1;  // Use a defined error code in practice.
     }
 
+    // Ensure the file is opened in a mode that allows reading.
     if (file->mode != 'r' && file->mode != 'a') {
         printf("Error: File is not open in a readable or append mode.\n");
-        return -1;  // Error due to incorrect mode
+        return -1;  // Use a defined error code in practice.
     }
 
-    int bytes_read = 0;  // Counter for the number of bytes actually read
-    int bytes_to_read = size;  // Adjust the size to not exceed the file size
-    char* char_buffer = (char*)buffer;  // Cast buffer to a char pointer for byte-wise manipulation
-
-    // Ensure we do not read past the end of the file
-    if (file->position + bytes_to_read > file->entry->size) {
-        bytes_to_read = file->entry->size - file->position;
-    }
-
-    if (bytes_to_read <= 0) {  // Check if there's nothing to read
+    // Calculate the number of bytes that can actually be read, which may be less than requested.
+    int bytes_to_read = min(size, file->entry->size - file->position);
+    if (bytes_to_read <= 0) {
+        // If there is no data left to read, return zero.
         printf("No more data to read from file.\n");
-        return 0;  // No data read
+        return 0;
     }
 
-    // Simulate the read operation (assuming the data starts right at the beginning of the buffer)
-    // Normally you'd perform actual storage read operations here.
-    memcpy(char_buffer, file->entry->buffer + file->position, bytes_to_read);
-    file->position += bytes_to_read;  // Update the position in the file
+    // Perform the actual data copying from the file's internal buffer to the provided buffer.
+    memcpy(buffer, file->entry->buffer + file->position, bytes_to_read);
 
-    
+    // Update the file's current position.
+    file->position += bytes_to_read;
 
+    // Provide feedback on how many bytes were read.
     printf("Read %d bytes from file '%s'.\n", bytes_to_read, file->entry->filename);
-    return bytes_to_read;  // Return the number of bytes read
+
+    // Return the number of bytes read.
+    return bytes_to_read;
 }
 
 /**
@@ -571,506 +365,69 @@ int fs_seek(FS_FILE* file, long offset, int whence) {
     // Successfully set the new position
     file->position = new_position;
     return 0; // Success indicates the new position was set without issues
-}////////////////////////////// 
+}
  
 
 
-
  
-// int fs_mv(const char* old_path, const char* new_path) {
-//     // Validate input paths
-//     if (old_path == NULL || new_path == NULL) {
-//         printf("Error: Both old and new paths must be provided.\n");
-//         fflush(stdout);
-//         return -1; // Invalid arguments
-//     }
 
-//     // Ensure source and destination are not the same
-//     if (strcmp(old_path, new_path) == 0) {
-//         printf("Error: Source and destination paths are the same.\n");
-//         fflush(stdout);
-//         return -2; // Source and destination are the same
-//     }
 
-//     // Ensure the source file exists
-//     FileEntry* srcEntry = FILE_find_file_entry(old_path);
-//     if (srcEntry == NULL) {
-//         printf("Error: Source file does not exist.\n");
-//         fflush(stdout);
-//         return -3; // Source file not found
-//     }
-
-//     // Ensure the destination file does not exist
-//     FileEntry* destEntry = FILE_find_file_entry(new_path);
-//     if (destEntry != NULL) {
-//         printf("Error: Destination file already exists.\n");
-//         fflush(stdout);
-//         return -4; // Destination file exists
-//     }
-
-//     // Perform the move operation
-//     // In a simple filesystem, this might just be renaming the entry
-//     // Ensure there's space in the filename field
-//     if (strlen(new_path) >= sizeof(srcEntry->filename)) {
-//         printf("Error: New path is too long.\n");
-//         fflush(stdout);
-//         return -5; // New path too long
-//     }
-
-//     // Update the file entry with the new path
-//     strncpy(srcEntry->filename, new_path, sizeof(srcEntry->filename));
-//     srcEntry->filename[sizeof(srcEntry->filename) - 1] = '\0'; // Ensure null termination
-
-//     printf("File moved from '%s' to '%s'.\n", old_path, new_path);
-//     fflush(stdout);
-//     return 0; // Success
-// }
-
-/////////////
-
-
-// int fs_wipe(const char* path) {
-//     printf("Wiping path: %s\n", path);
-//     // Check if path is NULL
-//     if (path == NULL) {
-//         printf("Error: Path is NULL.\n");
-//         fflush(stdout);
-//         return -1; // Indicate an error
-//     }
-
-//     // Find the file or directory entry
-//     FileEntry* entry = FILE_find_file_entry(path);
-//     if (entry == NULL) {
-//         printf("Error: File or directory not found.\n");
-//         fflush(stdout);
-//         return -2; // Indicate file not found
-//     }
-
-//     // If it's a directory, recursively wipe its contents
-//     if (entry->is_directory) {
-//         // The implementation here assumes you have a way to list and iterate through directory contents.
-//         DirectoryEntry* dirEntries = fs_list_directory(path);  
-//         for (int i = 0; dirEntries[i].name[0] != '\0'; i++) {
-//             // Construct the full path for each entry
-//             char fullPath[256]; // Assuming 256 is the max path length
-//             snprintf(fullPath, sizeof(fullPath), "%s/%s", path, dirEntries[i].name);
-
-//             // Recursively call fs_wipe on each entry
-//             int result = fs_wipe(fullPath);
-//             if (result != 0) {
-//                 printf("Warning: Failed to wipe '%s' within directory.\n", fullPath);
-//                 fflush(stdout);
-//                 // Decide how to handle partial failures. Continue, abort, or revert?
-//             }
-//         }
-//         // Depending on your design, you may need to free any allocated memory for dirEntries
-//     }
-
-//     uint32_t currentBlock = entry->start_block;
-//     uint32_t nextBlock;
-//     int result;
-
-//     // Deallocate blocks associated with this file or directory
-//     while (currentBlock != FAT_ENTRY_END && currentBlock < TOTAL_BLOCKS) {
-//         result = fat_get_next_block(currentBlock, &nextBlock);
-//         if (result != FAT_SUCCESS) {
-//             printf("Error navigating FAT or encountered FAT_ENTRY_END prematurely. Error code: %d\n", result);
-//             fflush(stdout);
-//             break; // Handle error or premature end appropriately
-//         }
-//         fat_free_block(currentBlock);
-//         if (nextBlock == FAT_ENTRY_END || nextBlock >= TOTAL_BLOCKS) {
-//             break; // Properly end loop if at the end or if an invalid next block is encountered
-//         }
-//         currentBlock = nextBlock;
-//     }
-
-//     // Mark the file system entry as not in use and optionally clear it
-//     entry->in_use = false;
-//     memset(entry, 0, sizeof(FileEntry));
-
-//     return 0; // Indicate success
-// }
-
-///////////////////////////////////////////
- 
-extern void flash_erase_all(void);
-
-int fs_format(const char* path) {
-    // Ensure the format request is intended for the root directory
-    if (strcmp(path, "/root") != 0) {
-        printf("Error: fs_format only supports formatting the root directory.\n");
-        fflush(stdout);
-        return -1;
-    }
-
-    // Securely erase all flash storage used by the filesystem
-    flash_erase_all();
-
-    // Reinitialize the FAT to mark all blocks as free
-    fat_init();
-
-    // Reset or reinitialize the root directory
-    int result = reset_root_directory();
-    if (result != 0) {
-        printf("Error: Failed to reset the root directory (error %d).\n", result);
-        fflush(stdout);
-        return result;
-    }
-
-    printf("Filesystem formatted successfully.\n");
-    fflush(stdout);
-    return 0; // Indicate success
-}
-
-
-
-////////////////////////////
-
-// int fs_rm(const char* path) {
-//     // Validate the input path
-//     if (!path) {
-//         printf("Error: Path is NULL.\n");
-//         fflush(stdout);
-//         return -1; // Invalid arguments
-//     }
-
-//     // Ensure the file exists
-//     FileEntry* fileEntry = FILE_find_file_entry(path);
-//     if (!fileEntry) {
-//         printf("Error: File '%s' not found.\n", path);
-//         fflush(stdout);
-//         return -2; // File not found
-//     }
-
-//     // Prevent deletion if the target is a directory (if applicable)
-//     if (fileEntry->is_directory) {
-//         printf("Error: '%s' is a directory, not a file. Use a different function to remove directories.\n", path);
-//         fflush(stdout);
-//         return -3; // Attempt to remove a directory with a file removal function
-//     }
-
-//     // Free all blocks associated with this file
-//     uint32_t currentBlock = fileEntry->start_block;
-//     uint32_t nextBlock;
-//     int result;
-
-//     while (currentBlock != FAT_ENTRY_END && currentBlock < TOTAL_BLOCKS) {
-//         result = fat_get_next_block(currentBlock, &nextBlock);
-//         if (result != FAT_SUCCESS) {
-//             printf("Error navigating FAT or encountered invalid next block index while trying to remove '%s'. Error code: %d\n", path, result);
-//             fflush(stdout);
-//             // Decide how to handle error: break out of the loop
-//             break; 
-//         }
-
-//         fat_free_block(currentBlock);
-
-//         // Check if the end of the chain is reached or an invalid block index is encountered
-//         if (nextBlock == FAT_ENTRY_END || nextBlock >= TOTAL_BLOCKS) {
-//             break; // Properly end loop
-//         }
-
-//         currentBlock = nextBlock;
-//     }
-//     // Mark the file entry as not in use
-//     memset(fileEntry, 0, sizeof(FileEntry));
-//     fileEntry->in_use = false;
-
-//     printf("File '%s' successfully removed.\n", path);
-//     fflush(stdout);
-//     return 0; // Success
-// }
-
-
-
-
-
-
-
-
-FileEntry* resolve_path(const char* path) {
-    if (path == NULL || path[0] != '/') {
-        printf("Error: Invalid path. Path must start with '/'\n");
-        return NULL; // Invalid path
-    }
-
-    if (strcmp(path, "/root") == 0) {
-        // Special case for root directory
-        return FILE_find_file_entry(path);
-    }
-
-    char pathCopy[256]; // Assuming path length won't exceed 255 characters
-    strncpy(pathCopy, path, sizeof(pathCopy));
-    pathCopy[sizeof(pathCopy) - 1] = '\0'; // Ensure null termination
-
-    char* token = strtok(pathCopy, "/");
-    FileEntry* currentEntry = NULL;
-    FileEntry* parentEntry = NULL;
-
-    while (token != NULL) {
-        char fullPath[256] = "/";
-        if (parentEntry != NULL) {
-            strncat(fullPath, parentEntry->filename, sizeof(fullPath) - strlen(fullPath) - 1);
-            strncat(fullPath, "/", sizeof(fullPath) - strlen(fullPath) - 1);
-        }
-        strncat(fullPath, token, sizeof(fullPath) - strlen(fullPath) - 1);
-
-        currentEntry = FILE_find_file_entry(fullPath);
-        if (currentEntry == NULL) {
-            // Path resolution failed, entry not found
-            printf("Error: Path resolution failed at '%s'.\n", token);
-            return NULL;
-        }
-
-        parentEntry = currentEntry; // Move to the next level
-        token = strtok(NULL, "/");
-    }
-
-    return currentEntry;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-uint32_t fs_seek_directory(const char* path) {
-    // First, find the directory entry for the given path.
-    DirectoryEntry* dirEntry = find_directory_entry(path);
-    if (dirEntry == NULL || !dirEntry->is_directory) {
-        printf("Directory '%s' not found or is not a directory.\n", path);
-        return 0; // Indicates failure to find the directory
-    }
-
-    // Assuming `start_block` of the DirectoryEntry indicates the first block of the directory in the FAT.
-    uint32_t startBlock = dirEntry->start_block;
-
-    // Translate the start block to a physical address in flash memory.
-    // This calculation depends on how your flash memory is organized and how blocks are mapped to physical addresses.
-    uint32_t address = FLASH_TARGET_OFFSET + startBlock * FILESYSTEM_BLOCK_SIZE;
-
-    // Check if the calculated address is within the flash memory bounds.
-    if (address >= FLASH_TARGET_OFFSET + FLASH_MEMORY_SIZE_BYTES) {
-        printf("Calculated address for directory '%s' is out of flash memory bounds.\n", path);
-        return 0; // Indicates failure due to out-of-bounds address
-    }
-
-    // The address is valid; return it.
-    return address;
-}
-
-
-
-// Function to list all files in the filesystem
-FileEntry* list_all_files(size_t *count) {
-    printf("Scanning all blocks for file entries...\n");
-    fflush(stdout);
-
-    // Allocate initial buffer to hold file entries
-    size_t capacity = 10;  // Initial capacity for file entries
-    FileEntry *files = malloc(capacity * sizeof(FileEntry));
-    if (!files) {
-        printf("Memory allocation failed for file list.\n");
-        fflush(stdout);
-        *count = 0;
-        return NULL;
-    }
-
-    size_t numFiles = 0;  // Number of files found
-    for (uint32_t i = 0; i < TOTAL_BLOCKS; i++) {
-        if (FAT[i] == FAT_ENTRY_END) {
-            uint32_t address = i * FILESYSTEM_BLOCK_SIZE;
-            FileEntry entry;
-            flash_read_safe2(address, (uint8_t *)&entry, sizeof(FileEntry));
-
-            // Check if it's a file entry and it's in use
-            if (entry.in_use && !entry.is_directory) {
-                if (numFiles >= capacity) {
-                    // Increase capacity if needed
-                    capacity *= 2;
-                    FileEntry *newFiles = realloc(files, capacity * sizeof(FileEntry));
-                    if (!newFiles) {
-                        printf("Memory reallocation failed.\n");
-                        fflush(stdout);
-                        free(files);
-                        *count = 0;
-                        return NULL;
-                    }
-                    files = newFiles;
-                }
-
-                // Store the file entry
-                files[numFiles++] = entry;
-            }
-        }
-    }
-
-    *count = numFiles;  // Set the count of files found
-    return files;  // Return the array of files
-}
-
-
-FileEntry* FILE_find_file_entry(const char* filename) {
-    const char* newfilename = prepend_slash(filename);
-    printf("\n\nENTERED FILE_find_file_entry\n");
-    fflush(stdout);
-
-    for (uint32_t i = 0; i < TOTAL_BLOCKS; i++) {
-        if (FAT[i] == FAT_ENTRY_END) {
-            printf("Checking block %u\n", i);
-            fflush(stdout);
-
-            uint32_t address = i * FILESYSTEM_BLOCK_SIZE;
-            FileEntry fileEntry;  // Temporary storage
-            flash_read_safe2(address, (uint8_t *)&fileEntry, sizeof(FileEntry));
-
-            printf("Checking file name: %s\n", fileEntry.filename);
-            printf("Checking file size: %u\n", fileEntry.size);
-            printf("Checking file start block: %u\n", fileEntry.start_block);
-            printf("Checking file in_use: %d\n", fileEntry.in_use);
-            printf("Checking if directory flag: %d\n", fileEntry.is_directory);
-            printf("buffer: %s\n", fileEntry.buffer);
-            fflush(stdout);
-            
-            if (fileEntry.in_use && !fileEntry.is_directory && strcmp(fileEntry.filename, newfilename) == 0) {
-                printf("File entry found: %s\n", newfilename);
-                fflush(stdout);
-                FileEntry* result = malloc(sizeof(FileEntry));  // Dynamically allocate memory
-                if (result) {
-                    *result = fileEntry;  // Copy the data
-                    return result;
-                } else {
-                    printf("Memory allocation failed.\n");
-                    fflush(stdout);
-                    return NULL;
-                }
-            }
-            sleep_ms(200);
-        }
-    }
-
-    printf("File entry not found: %s\n", filename);
-    fflush(stdout);
-    return NULL;
-}
-
-// //////////////////////
-
-// to do when is coppied, then update the buffer and size
+/**
+ * Copies a file from the source path to the destination path, ensuring not to overwrite existing files
+ * in the destination by appending "Copy" to the file name if necessary.
+ *
+ * @param source_path The path to the source file.
+ * @param dest_path The path to the destination where the file should be copied.
+ * @return Returns 0 on success, -1 on error.
+ */
 int fs_cp(const char* source_path, const char* dest_path) {
-
-    char source_directory_path[256] = {0};
-    char source_filenames[256] = {0};
-    
-    char dest_directory_path[256] = {0};
-    char dest_filename[256] = {0};
+    // Extract the directory and filename parts from the source and destination paths.
+    PathParts old_path = extract_last_two_parts(source_path);
+    PathParts new_path = extract_last_two_parts(dest_path);
 
 
-  
-
-    
-
-
-    split_path_fs_copy(source_path, source_directory_path, source_filenames);
-    split_path_fs_copy(dest_path, dest_directory_path, dest_filename);
-
-    // char source_filename[256] = prepend_slash(source_filenames);
-
-    char source_filename[256]; // Declaration without initializer
-    const char* modified_filename = prepend_slash(source_filenames); // Function call
-
-    if (modified_filename != NULL) {
-        strcpy(source_filename, modified_filename); // Copying the result into the array
-    } else {
-        printf("Failed to modify the source filename.\n");
-    }
-    
-
-
-    printf("Source Directory: %s\n", source_directory_path);
-    printf("Source Filename: %s\n", source_filename);
-    printf("Destination Directory: %s\n", dest_directory_path);
-    printf("Destination Filename: %s\n", dest_filename);
+    char* source_filename= old_path.filename;
+    char* dest_directory_path= new_path.directory;
+    char* dest_filename= new_path.filename;
 
 
     
+    // Validate the modified source filename.
     if (source_filename[0] == '\0') {
         printf("Error: Source path '%s' does not contain a valid file name.\n", source_path);
         return -1;
     }
-
-    // int sourcePathExist = check_full_file_existance(source_path_fileName);
-    // if (sourcePathExist == -1) {
-    //     printf("Error: Source path '%s' does not exist.\n", source_path);
-    //     return -1;
-    // }
-
-
+    // Find the file entry by name in the filesystem to get the unique file ID.
     int fileIndexSource = find_file_entry_by_name(source_filename);
     if (fileIndexSource == -1) {
         printf("Error: Source file '%s' does not exist.\n", source_filename);
         return -1;
     }
 
-    // if (dest_directory_path[0] == '\0') {
-    //     strcpy(dest_directory_path, "/root");  // Default to root if no path provided
-    // }
 
+    // Determine the destination directory, default to "/root" if unspecified.
     if (dest_directory_path[0] == '\0') {
         strcpy(dest_directory_path, "/root");  // Set default path if empty
-    } else {
-        // Attempt to find the last slash in the path
-        const char *lastSlash = strrchr(dest_directory_path, '/');
-        if (lastSlash != NULL) {
-            // There is at least one slash in the path
-            lastSlash++;  // Move past the slash to the name of the last directory
-            printf("Last directory: %s\n", lastSlash);
-            strcpy(dest_directory_path, lastSlash);  // Copy the last directory name back to the array
-        } else {
-            // No slash found, the whole path is a single directory name
-            printf("Last directory: %s\n", dest_directory_path);
-        }
-    }
+    } 
 
-
-    DirectoryEntry* destDirEntry = DIR_find_directory_entry(dest_directory_path);
+    // Lookup the directory entry for the destination path. in order to retrieve the parent directory ID.
+    // This way we can ensure the file is copied to a valid directory with a valid parent directory ID.
+    DirectoryEntry* destDirEntry = DIR_find_directory_entry(dest_directory_path); // Store parent directory ID for later use.
     if (!destDirEntry) {
         printf("Error: Destination directory '%s' does not exist.\n", dest_directory_path);
         return -1;
     }
-
     uint32_t parentID = destDirEntry->currentDirId;
-    printf("BEFORE FREE Parent Directory ID: %u\n", parentID);
-    free(destDirEntry);  // Don't forget to free the dynamically allocated memory
-    printf("AFTER FREE Parent Directory ID: %u\n", parentID);
+    free(destDirEntry);  
 
+    // Check if the filename already exists in the destination directory to avoid overwriting.
     // Check for duplicate file name in the destination directory
-    printf("\n\nChecking for duplicate file name in the destination directory...\n");
      for (int i = 0; i < MAX_FILES; i++) {
-        printf("Checking fileSystem[%d].in_use: %d\n", i, fileSystem[i].in_use);
-        printf("Checking fileSystem[%d].filename: %s\n", i, fileSystem[i].filename);
-        printf("Checking fileSystem[%d].parentDirId: %u\n", i, fileSystem[i].parentDirId);
-        printf("Checking parentID: %u\n", parentID);
-        printf("Checking source_filename: %s\n", source_filename);
-        printf("Checking i: %d\n", i);
         if (fileSystem[i].in_use && strcmp(fileSystem[i].filename, source_filename) == 0 && fileSystem[i].parentDirId == parentID) {
             printf("File name already exists in the destination directory.\n");
             printf("creating new file name\n");
             char newFileName[256]; // Allocate space for new filename plus "copy"
-            // snprintf(newFileName, sizeof(newFileName), "%scopy", source_filename);
-            // strcpy(fileSystem[fileIndex].filename, newFileName);
-            // printf("File name already exists, renamed to '%s'.\n", newFileName);
-            // break;
-
+   
 
         const char *lastDot = strrchr(source_filename, '.');
         if (lastDot) {
@@ -1091,12 +448,9 @@ int fs_cp(const char* source_path, const char* dest_path) {
 
         }
     }
-    ////////////////////////////////////////////////////////////////
-    // the file has to be coppy anyway, meaning the file has to created, so we will create a new entry where we will copy the contents 
-    // of the old file, that contents will be size, buffer, in_use, is_directory
-    printf("destination filename11: %s\n", dest_filename);    
 
-    FS_FILE* fileCopy = fs_open_for_coppy(dest_filename, "w"); // this will be the coppy file
+    // Create a new file entry for the destination file.  
+    FS_FILE* fileCopy = fs_open(dest_filename, "w"); // this will be the coppy file
         if (fileCopy == NULL) {
             printf("Error: Failed to open file '%s' for copying.\n", source_filename);
             return -1;
@@ -1119,285 +473,35 @@ int fs_cp(const char* source_path, const char* dest_path) {
 
     // now we have the index of the file that we want to copy, we can now copy the contents of the old file into the new file
     // we will copy the contents of the old file into the new file
-    fileSystem[fileIndex].in_use = true;
-    fileSystem[fileIndex].is_directory = false;
     fileSystem[fileIndex].size = oldfile->entry->size;
     fileSystem[fileIndex].parentDirId = parentID; /// this one we will change 
     memcpy( fileSystem[fileIndex].buffer, oldfile->entry->buffer, sizeof(oldfile->entry->buffer));
 
-    // now we have the new file created, we can now copy the contents of the old file into the new f
-
-
-    // now copy old file into the new file 
-    // we want to search for the 
-
-    /////////////////////////////////////////////////////////////////
-
-
-    printf("Checking for duplicate file name in the destination directory...DONE\n\n");
-
-    // Copy the file to the new directory
-    // fileSystem[fileIndex].parentDirId = parentID;
-    printf("File '%s' successfully copied to '%s'.\n", source_filename, dest_directory_path);
- 
-    printf("\n\nDEBUG section Befote write fs_cp\n");
-    printf("fileIndex: %d\n", fileIndex);
-    printf("fileSystem[fileIndex].filename: %s\n", fileSystem[fileIndex].filename);
-    printf("fileSystem[fileIndex].size: %u\n", fileSystem[fileIndex].size);
-    printf("fileSystem[fileIndex].start_block: %u\n", fileSystem[fileIndex].start_block);
-    printf("fileSystem[fileIndex].in_use: %d\n", fileSystem[fileIndex].in_use);
-    printf("fileSystem[fileIndex].is_directory: %d\n", fileSystem[fileIndex].is_directory);
-    printf("fileSystem[fileIndex].buffer: %s\n", fileSystem[fileIndex].buffer);
-    printf("fileSystem[fileIndex].unique_file_id: %u\n", fileSystem[fileIndex].unique_file_id);
-    printf("DEBUG FINISH\n\n");
+    // calculate the offset of the file in the flash memory
     uint32_t writeOffset = (fileSystem[fileIndex].start_block * FILESYSTEM_BLOCK_SIZE);
-    flash_write_safe2(writeOffset, (const uint8_t*)&fileSystem[fileIndex], sizeof(FileEntry));
-    printf("Data written to file.\n");
-    printf("File '%s' successfully copied to '%s'.\n", source_filename, dest_directory_path);
-    
+    flash_write_safe2(writeOffset, (const uint8_t*)&fileSystem[fileIndex], sizeof(FileEntry)); 
 
-
+    // Clean up open file handles.
+    fs_close(oldfile);
+    fs_close(fileCopy);
 
    return 0;
 
 }
 
 
-
-
-// checks if the file exists
-void split_path_fs_copy(const char* fullPath, char* directoryPath, char* fileName){
- 
-    char tempPath[256];
-    strcpy(tempPath, fullPath); // Make a copy of fullPath for manipulation
-
-    char *lastSlash = strrchr(tempPath, '/');
-    bool fileEncountered = false; // Flag to mark when a file has been encountered
-
-    // Initialize the outputs
-    directoryPath[0] = '\0';
-    fileName[0] = '\0';
-
-    if (lastSlash) {
-        *lastSlash = '\0'; // Terminate the directory path
-        strcpy(fileName, lastSlash + 1); // Copy the file name part
-        strcpy(directoryPath, tempPath); // Copy the directory part
-    } else {
-        // No slashes found, it's a single segment
-        strcpy(fileName, fullPath);
-    }
-    
-    // Check each segment for a file pattern
-    strcpy(tempPath, fullPath); // Reset tempPath
-    char *segment = strtok(tempPath, "/");
-    while (segment) {
-        if (strrchr(segment, '.') != NULL) { // Check if the segment looks like a file
-            fileEncountered = true;
-        } else if (fileEncountered) { // A directory or another segment follows a file
-            printf("Invalid path: '%s'. A file segment cannot be followed by another segment.\n", fullPath);
-            
-        }
-        segment = strtok(NULL, "/");
-    }
-
-    // Determine if the final part is a file or directory
-    bool finalPartIsFile = strrchr(fileName, '.') != NULL; 
-    if (!finalPartIsFile) {
-        fileName == NULL;
-    }
-   
-}
-
-// void split_path_fs_copy(const char* fullPath, char* directoryPath, char* fileName) {
-//     const char *lastSlash = strrchr(fullPath, '/');
-//     if (lastSlash) {
-//         strncpy(directoryPath, fullPath, lastSlash - fullPath);
-//         directoryPath[lastSlash - fullPath] = '\0';  // Null terminate the directory path
-//         strcpy(fileName, lastSlash + 1);  // Copy the file name part
-//     } else {
-//         directoryPath[0] = '\0';  // No directory part
-//         strcpy(fileName, fullPath);  // Entire path is a filename
-//     }
-// }
-
-
-int check_full_file_existance(const char* fullPath) {
-
-    FileEntry* entry = FILE_find_file_entry(fullPath);
-
-    if (entry == NULL) {
-    printf("Error: File '%s' not found for reading.\n", fullPath);
-    return -1;
-    }
-    return 1;
-
-} 
- 
-
-
-
-
-
-
- 
-FS_FILE* fs_open_for_coppy(const char* FullPath, const char* mode) {
-
-     if (FullPath == NULL || mode == NULL) {
-        printf("Error: Path or mode is NULL.\n");
-        fflush(stdout);
-        return NULL;
-    }
-
-   
-
-
-    if (strcmp(mode, "w") == 0) {
-
-        printf("Opening file '%s' in write mode.\n", FullPath);
-        PathParts parts = extract_last_two_parts(FullPath);
-        const char* path = prepend_slash(FullPath);
-    
-        if (path != NULL) {
-        printf("Modified Path: %s\n", path);
-        } else {
-            printf("Failed to modify the path.\n");
-        }
-
-    
-        FileEntry* entry = FILE_find_file_entry(path);
-        bool isNewFileCreation = (entry == NULL) && (strchr("wa", mode[0]) != NULL);
- 
-
-        
-        printf("code 3\n");
-        // Attempt to create a new file entry if the file does not exist and the mode allows for writing or appending
-        if (isNewFileCreation) {
-            entry = fs_cp_create_new_file_entry(path);
-            if (entry == NULL) {
-                return NULL; // Error message is handled in create_new_file_entry
-            }
-        } else if (entry == NULL) {
-            printf("Error: File not found for reading.\n");
-            fflush(stdout);
-            return NULL;
-        }
-        printf("code 4\n");
-      
-
-
-        // reset_file_content(entry);
-        uint32_t offsetInBytes;
-        const uint32_t offsetFromEntry = entry->start_block;
-        printf("offsetFromEntry dd: %u\n", offsetFromEntry);
-        //print the fileName 
-        offsetInBytes =  offsetFromEntry * FILESYSTEM_BLOCK_SIZE;
-        printf("offsetInBytes dd: %u\n", offsetInBytes);
-        flash_write_safe2(offsetInBytes, (const uint8_t*)entry, sizeof(FileEntry));
-
-            // Create and initialize the FS_FILE structure
-        FS_FILE* file = (FS_FILE*)malloc(sizeof(FS_FILE));
-        if (file == NULL) {
-            printf("Error: Memory allocation failed for FS_FILE.\n");
-            fflush(stdout);
-            return NULL;
-        }
-
-        file->entry = entry;
-        file->position = 0 ;  
-        file->mode = 'w'; // Simplified mode determination
-
- 
-    return file;
- 
-
-    }
-   
-    return NULL;
-}
-
-
-
-
-
-
-
-
-
-FileEntry* fs_cp_create_new_file_entry(const char* path) {
-    printf("debug create_new_file_entry for path: %s\n", path);
-    for (int i = 0; i < MAX_FILES; i++) {
-        if (!fileSystem[i].in_use) {
-            strncpy(fileSystem[i].filename, path, sizeof(fileSystem[i].filename) - 1);
-            fileSystem[i].filename[sizeof(fileSystem[i].filename) - 1] = '\0';
-            fileSystem[i].in_use = true;
-            fileSystem[i].is_directory = false; // Default to file
-            fileSystem[i].size = 0;
-            fileSystem[i].start_block = fat_allocate_block();
-            fileSystem[i].unique_file_id = generateUniqueId();
-
-
-            printf("New file created: %s\n", fileSystem[i].filename);
-            printf("Start block: %u\n", fileSystem[i].start_block);
-            printf("File size: %u\n", fileSystem[i].size);
-            printf("Filesystem entry index: %d\n", i);
-            printf("Parent Directory ID: %u\n", fileSystem[i].parentDirId);
-            
-            fflush(stdout);
-            if (fileSystem[i].start_block == FAT_NO_FREE_BLOCKS) {
-                printf("Error: No space left on device to create new file.\n");
-                fflush(stdout);
-                memset(&fileSystem[i], 0, sizeof(FileEntry)); // Cleanup
-                fileSystem[i].in_use = false; // Explicitly mark it as not in use
-                return NULL;
-            }
-            return &fileSystem[i];
-        }
-    }
-    printf("Error: Filesystem is full, cannot create new file.\n");
-    fflush(stdout);
-    return NULL;
-}
-
-
- 
-
-
-
-
-
-
-
-
-
-
-
-
-
  int fs_mv(const char* old_path, const char* new_path){
 
-    char source_directory_path[256] = {0};
-    char source_filenames[256] = {0};
-    
-    char dest_directory_path[256] = {0};
-    char dest_filename[256] = {0};
 
-  
+    PathParts old_paths = extract_last_two_parts(old_path);
+    PathParts new_paths = extract_last_two_parts(new_path);
 
 
-    split_path_fs_copy(old_path, source_directory_path, source_filenames);
-    split_path_fs_copy(new_path, dest_directory_path, dest_filename);
+    char* source_filename = old_paths.filename;
+    char* dest_directory_path= new_paths.directory;
+    char* dest_filename= new_paths.filename;
 
 
-
-    char source_filename[256]; // Declaration without initializer
-    const char* modified_filename = prepend_slash(source_filenames); // Function call
-
-    if (modified_filename != NULL) {
-        strcpy(source_filename, modified_filename); // Copying the result into the array
-    } else {
-        printf("Failed to modify the source filename.\n");
-    }
-    
     
     if (source_filename[0] == '\0') {
         printf("Error: Source path '%s' does not contain a valid file name.\n", old_path);
@@ -1405,23 +509,10 @@ FileEntry* fs_cp_create_new_file_entry(const char* path) {
     }
 
 
-    ///////////////////////////////////////////////////////////////////////////////////////
-
     if (dest_directory_path[0] == '\0') {
         strcpy(dest_directory_path, "/root");  // Set default path if empty
-    } else {
-        // Attempt to find the last slash in the path
-        const char *lastSlash = strrchr(dest_directory_path, '/');
-        if (lastSlash != NULL) {
-            // There is at least one slash in the path
-            lastSlash++;  // Move past the slash to the name of the last directory
-            printf("Last directory: %s\n", lastSlash);
-            strcpy(dest_directory_path, lastSlash);  // Copy the last directory name back to the array
-        } else {
-            // No slash found, the whole path is a single directory name
-            printf("Last directory: %s\n", dest_directory_path);
-        }
-    }
+    } 
+
 
 
     DirectoryEntry* destDirEntry = DIR_find_directory_entry(dest_directory_path);
@@ -1429,17 +520,10 @@ FileEntry* fs_cp_create_new_file_entry(const char* path) {
         printf("Error: Destination directory '%s' does not exist.\n", dest_directory_path);
         return -1;
     }
-
     uint32_t parentID = destDirEntry->currentDirId;
- 
     free(destDirEntry);  // Don't forget to free the dynamically allocated memory
 
-    ///////////////////////////////////////////////////////////////////////////////////////
-
-    
-
-       
-    // now open the previous file to read the contents
+    // now open to get the unique id of the file that we want to copy
     FS_FILE* oldfile = fs_open(source_filename, "r");
 
     if (oldfile == NULL) {
@@ -1453,30 +537,18 @@ FileEntry* fs_cp_create_new_file_entry(const char* path) {
         printf("Error: File '%s' not found for reading.\n", source_filename);
         return -1;
     }
-
-
     fileSystem[fileIndex].parentDirId = parentID; /// this one we will change 
-
-
-
     uint32_t writeOffset = (fileSystem[fileIndex].start_block * FILESYSTEM_BLOCK_SIZE);
 
     flash_write_safe2(writeOffset, (const uint8_t*)&fileSystem[fileIndex], sizeof(FileEntry));
     printf("Data written to file.\n");
     printf("File '%s' successfully copied to '%s'.\n", source_filename, dest_directory_path);
     
-
-
-
    return 0;
-
 }
 
 
 
-
-
-////////////////////////////////////////////////////////
 
 int fs_rm(const char* path) {
     // Validate the input path
@@ -1551,7 +623,6 @@ int fs_rm(const char* path) {
 
 
 
-
 int fs_wipe(const char* path){
     // Validate the input path
     if (!path) {
@@ -1599,17 +670,12 @@ int fs_wipe(const char* path){
     }
    
 
-    printf("File '%s' successfully removed.\n", path);
-
     // find the file in the fileSystem array and update the in-use flag to false
     int fileIndex = find_file_entry_by_name(path);
     if (fileIndex == -1) {
         printf("Error: File '%s' not found for reading.\n", path);
         return -1;
     }
-  
-
-
      uint32_t writeOffset = (fileSystem[fileIndex].start_block * FILESYSTEM_BLOCK_SIZE);
 
     flash_erase_safe2(writeOffset);

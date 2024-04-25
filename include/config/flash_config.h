@@ -47,7 +47,7 @@
 
     // The maximum number of files the filesystem can support. This is determined by the available
     // space and how the filesystem is structured, ensuring a limit to prevent overallocation.
-    #define MAX_FILES 10
+    #define MAX_FILES 20
 
     // Calculates the maximum size of a file, aligning it to the block size. This ensures that
     // file sizes are optimized for the block-based storage system, avoiding unnecessary fragmentation. 
@@ -59,7 +59,7 @@
     #define FAT_ENTRY_RESERVED 0xFFFFFFFC // You can choose an appropriate value
 
 
-    #define MAX_DIRECTORY_ENTRIES 5
+    #define MAX_DIRECTORY_ENTRIES 20
 
 
 
@@ -69,5 +69,12 @@
     #define FAT_OUT_OF_RANGE -2
     #define FAT_INVALID_OPERATION -3
 
+
+
+
+#define READ_ERROR_NULL_POINTER -1
+#define READ_ERROR_INVALID_SIZE -2
+#define READ_ERROR_INCORRECT_MODE -3
+#define READ_SUCCESS_NO_DATA 0
 
     #endif // FLASH_CONFIG_H

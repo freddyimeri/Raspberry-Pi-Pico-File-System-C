@@ -147,11 +147,11 @@ void flash_read_safe2(uint32_t offset, uint8_t *buffer, size_t buffer_len) {
     // Calculate absolute flash offset
     uint32_t flash_offset =  offset;
 
-    printf("\n\n\nDebug section in flash_read_safe2\n");
-    printf("flash_offset: %d\n", flash_offset);
-    printf("offset: %d\n", offset);
-    printf("buffer_len: %d\n", buffer_len);
-    printf("END Debug section in flash_read_safe2\n\n\n");
+    // printf("\n\n\nDebug section in flash_read_safe2\n");
+    // printf("flash_offset: %d\n", flash_offset);
+    // printf("offset: %d\n", offset);
+    // printf("buffer_len: %d\n", buffer_len);
+    // printf("END Debug section in flash_read_safe2\n\n\n");
  
     
     // Perform the memory copy from flash to buffer
@@ -181,11 +181,11 @@ void flash_write_safe2(uint32_t offset, const uint8_t *data, size_t data_len) {
 
 
     printf("\n\n\nDebug section in flash_write_safe2\n");
-    printf("flash_offset: %d\n", flash_offset);
-    printf("offset: %d\n", offset);
-    printf("data_len: %d\n", data_len);
-    printf("FLASH_SECTOR_SIZE: %d\n", FLASH_SECTOR_SIZE);
-    printf("END Debug section in flash_write_safe2\n\n\n");
+    // printf("flash_offset: %d\n", flash_offset);
+    // printf("offset: %d\n", offset);
+    // printf("data_len: %d\n", data_len);
+    // printf("FLASH_SECTOR_SIZE: %d\n", FLASH_SECTOR_SIZE);
+    // printf("END Debug section in flash_write_safe2\n\n\n");
     // Disable interrupts for a safe flash operation
     uint32_t ints = save_and_disable_interrupts();
 

@@ -18,6 +18,8 @@
         "directories.h": "c",
         "ctype.h": "c",
         "filesystem_helper.h": "c",
-        "directory_helpers.h": "c"
+        "directory_helpers.h": "c",
+        "limits": "c",
+        "typeinfo": "c"
     }
 }

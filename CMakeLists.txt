@@ -14,6 +14,7 @@ include_directories(include/directory)
 include_directories(include/FAT)
 include_directories(include/filesystem)
 include_directories(include/flash)
+include_directories(include/HighLevelAPI)
 
 add_executable(my_blink
     src/main.c
@@ -23,7 +24,7 @@ add_executable(my_blink
     src/FAT/fat_fs.c
     src/directory/directories.c
     src/directory/directory_helpers.c
-    
+    src/HighLevelAPI/visual.c
 )
 pico_enable_stdio_usb(my_blink 1)
 pico_enable_stdio_uart(my_blink 0)
