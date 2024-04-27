@@ -39,6 +39,7 @@ typedef struct {
 extern FileEntry fileSystem[MAX_FILES];
 
  void fs_init(void);
+ void init_file_entries() ;
 FS_FILE* fs_open(const char* path, const char* mode);
 void fs_close(FS_FILE* file);
 int fs_read(FS_FILE* file, void* buffer, int size);

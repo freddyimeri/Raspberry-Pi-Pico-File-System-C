@@ -16,6 +16,21 @@ DirectoryEntry dirEntries[MAX_DIRECTORY_ENTRIES];
 
 
 
+
+
+void init_directory_entries() {
+    for (int i = 0; i < MAX_DIRECTORY_ENTRIES; i++) {
+        dirEntries[i].in_use = false;
+        dirEntries[i].is_directory = false;
+        dirEntries[i].name[0] = '\0';  // Empty string indicates unused
+        dirEntries[i].parentDirId = 0;
+        dirEntries[i].currentDirId = 0;
+        dirEntries[i].size = 0;
+        dirEntries[i].start_block = 0;
+    }
+}
+
+
  
  bool fs_create_directory(const char* directory) {
     if (directory == NULL || *directory == '\0') {
@@ -24,7 +39,7 @@ DirectoryEntry dirEntries[MAX_DIRECTORY_ENTRIES];
     }
 
     // Use find_directory_entry instead of createDirectoryEntry to check if the directory exists
-    DirectoryEntry* existingDir = find_directory_entry(directory);
+    DirectoryEntry* existingDir = DIR_find_directory_entry(directory);
     if (existingDir != NULL) {
         printf("ERROR: Directory already exists: %s\n", directory);
         return false;
@@ -37,6 +52,17 @@ DirectoryEntry dirEntries[MAX_DIRECTORY_ENTRIES];
         fflush(stdout);
         return false;
     }
+
+    // Print the directory entry details
+    printf("\n\nDetail of of dire entry");
+    printf("Directory start block: %u\n", entry->start_block);
+    printf("Directory size: %u\n", entry->size);
+    printf("Directory parent ID: %u\n", entry->parentDirId);
+    printf("Directory current ID: %u\n", entry->currentDirId);
+    printf("Directory is_directory: %d\n", entry->is_directory);
+    printf("Directory in_use: %d\n", entry->in_use);
+    printf("Directory name: %s\n", entry->name);
+    fflush(stdout);
 
     // Compute the offset in bytes and write the directory entry to flash storage
     uint32_t offsetInBytes = entry->start_block * FILESYSTEM_BLOCK_SIZE;

@@ -1,4 +1,3 @@
-//directory_helpers.h
 #ifndef VISUAL_H
 #define VISUAL_H
 

@@ -33,7 +33,7 @@ extern DirectoryEntry dirEntries[MAX_DIRECTORY_ENTRIES];
 
 
 
-
+void init_directory_entries();
 bool fs_create_directory(const char* directory);
 bool reset_root_directory(void);
  

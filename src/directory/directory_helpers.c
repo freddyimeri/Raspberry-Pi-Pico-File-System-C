@@ -1,6 +1,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "hardware/flash.h"
+#include "hardware/sync.h"
 
 #include "../config/flash_config.h"    
 #include "../FAT/fat_fs.h"            
@@ -18,16 +20,18 @@
 
 DirectoryEntry* createDirectoryEntry(const char* path) {
     printf("debug createDirectoryEntry for path: %s\n", path);
+    uint32_t saved_irq_status = save_and_disable_interrupts(); // Save and disable interrupts
     for (int i = 0; i < MAX_DIRECTORY_ENTRIES; i++) {
         if (!dirEntries[i].in_use) {
             uint32_t rootDirId = get_root_directory_id();
-            strncpy(dirEntries[i].name, path, sizeof(dirEntries[i].name) - 1);
+            strncpy(dirEntries[i].name, path, sizeof(fileSystem[i].filename) - 1);
             dirEntries[i].parentDirId = rootDirId;
             dirEntries[i].currentDirId = generateUniqueId();
             dirEntries[i].is_directory = false; 
             dirEntries[i].start_block = fat_allocate_block();
             dirEntries[i].in_use = true;
             dirEntries[i].size = 0;
+            dirEntries[i].is_directory = true;
 
             printf("New directory created: %s\n", dirEntries[i].name);
             printf("Start block: %u\n", dirEntries[i].start_block);
@@ -43,13 +47,16 @@ DirectoryEntry* createDirectoryEntry(const char* path) {
                 fflush(stdout);
                 memset(&dirEntries[i], 0, sizeof(FileEntry)); // Cleanup
                 dirEntries[i].in_use = false; // Explicitly mark it as not in use
+                restore_interrupts(saved_irq_status); // Restore interrupts
                 return NULL;
             }
+            restore_interrupts(saved_irq_status); // Restore interrupts
             return &dirEntries[i];
         }
     }
     printf("Error: dirEntries is full, cannot create new file.\n");
     fflush(stdout);
+    restore_interrupts(saved_irq_status); // Restore interrupts
     return NULL;
 }
  
@@ -75,9 +82,8 @@ uint32_t get_root_directory_id() {
 
     // Store the ID of the root directory
     uint32_t rootDirId = dirEntry->currentDirId;
-
+    printf("Root directory ID get_root_directory_id: %u\n", rootDirId);
     // Free the directory entry if your system allocates memory dynamically in DIR_find_directory_entry
-    free(dirEntry);  // Ensure to free this memory to prevent memory leaks
 
     return rootDirId;
 }
@@ -96,8 +102,30 @@ void DIR_all_directory_entries(void) {
             printf("Current Directory ID: %u\n", dirEntries[i].currentDirId);
             printf("Start block: %u\n", dirEntries[i].start_block);
             printf("Directory size: %u\n", dirEntries[i].size);
+            printf("Directory entry index: %d\n", i);
+            printf("in_use: %d\n", dirEntries[i].in_use);
+            printf("is_directory: %d\n", dirEntries[i].is_directory);
             fflush(stdout);
         }
+    }
+}
+
+ 
+void DIR_all_directory_entriesEX(void) {
+    printf("\n\nENTERED DIR_all_directory_entries\n");
+    for (int i = 0; i < MAX_DIRECTORY_ENTRIES; i++) {
+        
+            printf("\n\nEnrty %d is a directory\n", i);
+            printf("Directory entry %d: %s\n", i, dirEntries[i].name);
+            printf("Parent Directory ID: %u\n", dirEntries[i].parentDirId);
+            printf("Current Directory ID: %u\n", dirEntries[i].currentDirId);
+            printf("Start block: %u\n", dirEntries[i].start_block);
+            printf("Directory size: %u\n", dirEntries[i].size);
+            printf("Directory entry index: %d\n", i);
+            printf("in_use: %d\n", dirEntries[i].in_use);
+            printf("is_directory: %d\n", dirEntries[i].is_directory);
+            fflush(stdout);
+        
     }
 }
 
@@ -115,9 +143,16 @@ DirectoryEntry* find_free_directory_entry(void) {
 
 DirectoryEntry* DIR_find_directory_entry(const char* directoryName) {
     printf("\n\nENTERED DIR_find_directory_entry\n");
+    printf("Directory name: %s\n", directoryName);
     fflush(stdout);
+    if(directoryName == NULL) {
+        printf("Directory name is NULL.\n");
+        return NULL;
+    }
 
-    const char* path = prepend_slash(directoryName);
+    char path[512]; // Define a sufficiently large buffer for the path
+    prepend_slash(directoryName, path, sizeof(path));
+    printf("Prepended path: %s\n", path);
 
     for (uint32_t i = 0; i < MAX_DIRECTORY_ENTRIES; i++) {
         if (dirEntries[i].in_use && dirEntries[i].is_directory && strcmp(dirEntries[i].name, path) == 0) {

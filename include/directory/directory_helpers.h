@@ -28,7 +28,7 @@ uint32_t get_root_directory_id();
 
 bool is_directory_valid(const DirectoryEntry* directoryEntry);
 
-
+void DIR_all_directory_entriesEX(void);
 DirectoryEntry* DIR_find_directory_entry(const char* directoryName);
 DirectoryEntry* find_directory_entry(const char* path); // been used once in directories.c fs_create_directory
 
