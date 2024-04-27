@@ -1,2 +1,9 @@
 /build/
+// please hide the file omain.c
+amain.c
+cpmain.c
+domain.c
+FATmain.c
+aaamain.C
+
  
