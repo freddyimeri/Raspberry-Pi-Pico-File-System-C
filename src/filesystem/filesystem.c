@@ -102,7 +102,7 @@ void init_file_entries() {
         fileSystem[i].parentDirId = 0;
         fileSystem[i].size = 0;
         fileSystem[i].start_block = 0;
-        memset(fileSystem[i].buffer, 0, sizeof(fileSystem[i].buffer));  // Clear the buffer
+        // memset(fileSystem[i].buffer, 0, sizeof(fileSystem[i].buffer));  // Clear the buffer
         fileSystem[i].unique_file_id = 0;
     }
 }
@@ -157,72 +157,158 @@ FS_FILE* fs_open(const char* FullPath, const char* mode) {
     }
 
     return file;
-}
+
+
+} 
+// int fs_write(FS_FILE* file, const void* buffer, int size) {
+//     if (file == NULL || buffer == NULL || size < 0) {
+//         printf("Error: Invalid input parameters.\n");
+//         return -1;
+//     }
+
+//     if (file->mode != 'a' && file->mode != 'w') {
+//         printf("Error: File not open in a writable or appendable mode.\n");
+//         return -1;
+//     }
+
+//     uint32_t currentBlock = file->entry->start_block;
+//     uint32_t currentBlockPosition = file->position % FILESYSTEM_BLOCK_SIZE;
+//     const uint8_t* writeBuffer = (const uint8_t*) buffer;
+//     int bytesWritten = 0;
+//     bool isFirstBlock = (file->position == 0);  // Identify if we're starting at the beginning of the file.
+
+//     while (size > 0) {
+//         printf("size FATTTT: %d\n", size); 
+//         // Check if a new block is needed
+//         if (currentBlockPosition == FILESYSTEM_BLOCK_SIZE || currentBlock == FAT_ENTRY_END) {
+//             printf("Allocating new block for file '%s'.\n", file->entry->filename);
+//             uint32_t newBlock = fat_allocate_block();
+//             if (newBlock == FAT_NO_FREE_BLOCKS) {
+//                 printf("Error: No free blocks available.\n");
+//                 return -1;
+//             }
+//             if (currentBlock != FAT_ENTRY_END) {
+//                 printf("Linking block %u to new block %u.\n", currentBlock, newBlock);
+//                 fat_link_blocks(currentBlock, newBlock);
+//             } else if (isFirstBlock) {
+//                 printf("Setting start block of file to %u.\n", newBlock);
+//                 file->entry->start_block = newBlock;  // Only set start_block if it's the first block being written to a new file.
+//                 isFirstBlock = false;
+//             }
+//             currentBlock = newBlock;
+//             currentBlockPosition = 0;
+//         }
+
+//         // Calculate writable space in the current block
+//         int remainingSpaceInBlock = FILESYSTEM_BLOCK_SIZE - currentBlockPosition;
+//         int toWrite = MIN(remainingSpaceInBlock, size);
+
+//         if (isFirstBlock) {
+//             // Adjust for the FileEntry metadata space if it's the very first write operation of the file
+//             currentBlockPosition += sizeof(FileEntry);
+//             remainingSpaceInBlock = FILESYSTEM_BLOCK_SIZE - currentBlockPosition;
+//             toWrite = MIN(remainingSpaceInBlock, size);
+//             isFirstBlock = false;  // Ensure this adjustment only happens once
+//         }
+
+//         uint32_t writeOffset = currentBlock * FILESYSTEM_BLOCK_SIZE + currentBlockPosition;
+//         printf("Writing %d bytes to block %u at offset %u.\n", toWrite, currentBlock, writeOffset);
+//         flash_write_safe2(writeOffset, writeBuffer, toWrite);
+
+//         writeBuffer += toWrite;
+//         bytesWritten += toWrite;
+//         size -= toWrite;
+//         file->position += toWrite;
+//         currentBlockPosition += toWrite;
+
+//         // Check if we've written to the end of the block
+//         if (currentBlockPosition >= FILESYSTEM_BLOCK_SIZE) {
+//             currentBlockPosition = 0; // Reset for next block
+//             currentBlock = FAT_ENTRY_END; // Force allocation of new block on next iteration
+//         }
+//     }
+
+//     printf("Total %d bytes written.\n", bytesWritten);
+//     return bytesWritten;
+// }
 
 
 
-// to doo it needs to append the data to the global fileSystem array
-/**
- * Writes data to a file.
- *
- * @param file The FS_FILE pointer representing the file to write to.
- * @param buffer The buffer containing data to write to the file.
- * @param size The number of bytes to write.
- * @return The number of bytes actually written, or -1 if an error occurs.
- */
 int fs_write(FS_FILE* file, const void* buffer, int size) {
-    // Validate the inputs for null pointers and ensure size is non-negative.
     if (file == NULL || buffer == NULL || size < 0) {
-        printf("Error: Invalid arguments for fs_write.\n");
-        return -1; // Error code for invalid arguments.
+        printf("Error: Invalid input parameters.\n");
+        return -1;
     }
 
-    // Check if the file is opened in a mode that allows writing.
     if (file->mode != 'a' && file->mode != 'w') {
         printf("Error: File not open in a writable or appendable mode.\n");
-        return -1; // Error code for incorrect mode.
+        return -1;
     }
 
-    int writeSize = size;
-    // Adjust the write size based on the file's mode and capacity.
-    if (file->mode == 'a') {
-        printf("Appending data to file '%s'.\n", file->entry->filename);
-        // Calculate maximum size that can be appended without overflowing the buffer.
-        writeSize = min(size, sizeof(file->entry->buffer) - file->entry->size);
-        if (writeSize < size) {
-            printf("Warning: Truncating write size because of buffer limit.\n");
+    uint32_t currentBlock = file->entry->start_block;
+    uint32_t currentBlockLINK = currentBlock;;
+    uint32_t currentBlockPosition = file->position % FILESYSTEM_BLOCK_SIZE;
+    const uint8_t* writeBuffer = (const uint8_t*) buffer;
+    int bytesWritten = 0;
+    bool isFirstBlock = (file->position == 0);  // Identify if we're starting at the beginning of the file.
+
+    while (size > 0) {
+        printf("size FATTTT: %d\n", size); 
+        // Check if a new block is needed
+        if (currentBlockPosition == FILESYSTEM_BLOCK_SIZE || currentBlock == FAT_ENTRY_END) {
+            printf("Allocating new block for file '%s'.\n", file->entry->filename);
+            uint32_t newBlock = fat_allocate_block();
+            printf("newBlock: %u\n", newBlock);
+            printf("currentBlockLINK: %u\n", currentBlockLINK);
+            if (newBlock == FAT_NO_FREE_BLOCKS) {
+                printf("Error: No free blocks available.\n");
+                return -1;
+            }//FAT_ENTRY_END
+
+                printf("Linking block %u to new block %u.\n", currentBlock, newBlock);
+                fat_link_blocks(currentBlockLINK, newBlock);
+             if (isFirstBlock) {
+                printf("Setting start block of file to %u.\n", newBlock);
+                file->entry->start_block = newBlock;  // Only set start_block if it's the first block being written to a new file.
+                isFirstBlock = false;
+            }
+            currentBlock = newBlock;
+            currentBlockPosition = 0;
         }
-        
-        char tempBuffer[256];
-        strcpy(tempBuffer, file->entry->buffer);
-        printf("tempBuffer: %s\n", tempBuffer);
-        // Append the new data to the temporary buffer
-        strncat(tempBuffer, buffer, size);
-        printf("tempBuffer: %s\n", tempBuffer);
-        // Copy the updated content back to the file entry buffer
-        strcpy(file->entry->buffer, tempBuffer);
-        
-       
-        file->entry->size += writeSize; // Update the file size.
-    } else if (file->mode == 'w') {
-        printf("Writing data to file '%s'.\n", file->entry->filename);
-        // Overwrite data from the start of the buffer.
-        memcpy(file->entry->buffer, buffer, min(size, sizeof(file->entry->buffer)));
-        file->entry->size = writeSize; // Reset the file size to the write size.
+        currentBlockLINK = currentBlock;
+        // Calculate writable space in the current block
+        int remainingSpaceInBlock = FILESYSTEM_BLOCK_SIZE - currentBlockPosition;
+        int toWrite = MIN(remainingSpaceInBlock, size);
+
+        if (isFirstBlock) {
+            // Adjust for the FileEntry metadata space if it's the very first write operation of the file
+            // currentBlockPosition += sizeof(FileEntry);
+            remainingSpaceInBlock = FILESYSTEM_BLOCK_SIZE - currentBlockPosition;
+            toWrite = MIN(remainingSpaceInBlock, size);
+            isFirstBlock = false;  // Ensure this adjustment only happens once
+        }
+
+        uint32_t writeOffset = currentBlock * FILESYSTEM_BLOCK_SIZE + currentBlockPosition;
+        printf("Writing %d bytes to block %u at offset %u.\n", toWrite, currentBlock, writeOffset);
+        flash_write_safe2(writeOffset, writeBuffer, toWrite);
+
+        writeBuffer += toWrite;
+        bytesWritten += toWrite;
+        size -= toWrite;
+        file->position += toWrite;
+        currentBlockPosition += toWrite;
+
+        // Check if we've written to the end of the block
+        if (currentBlockPosition >= FILESYSTEM_BLOCK_SIZE) {
+            currentBlockPosition = 0; // Reset for next block
+            currentBlock = FAT_ENTRY_END; // Force allocation of new block on next iteration
+        }
     }
 
-    // Update the file's position.
-    file->position += writeSize;
-
-    // Calculate the flash memory offset where the file's data starts.
-    uint32_t writeOffset = file->entry->start_block * FILESYSTEM_BLOCK_SIZE;
-    // Write the updated file entry back to the flash memory.
-    flash_write_safe2(writeOffset, (const uint8_t*)file->entry, sizeof(FileEntry));
-
-    // Display the number of bytes written to the file.
-    printf("fs_write: %d bytes written.\n", writeSize);
-    return writeSize; // Return the number of bytes successfully written.
+    printf("Total %d bytes written.\n", bytesWritten);
+    return bytesWritten;
 }
+
 
 
 
@@ -260,45 +346,172 @@ void fs_close(FS_FILE* file) {
  * @param size   The maximum number of bytes to read.
  * @return The number of bytes actually read, or a negative error code if an error occurred.
  */
+// int fs_read(FS_FILE* file, void* buffer, int size) {
+//     // Validate the file and buffer pointers to ensure they are not NULL.
+//     if (file == NULL || buffer == NULL) {
+//         printf("Error: Null file or buffer pointer provided.\n");
+//         return -1;  // Use a defined error code in practice.
+//     }
+
+//     // Validate the request size to ensure it's positive.
+//     if (size <= 0) {
+//         printf("Error: Invalid size to read (%d).\n", size);
+//         return -1;  // Use a defined error code in practice.
+//     }
+
+//     // Ensure the file is opened in a mode that allows reading.
+//     if (file->mode != 'r' && file->mode != 'a') {
+//         printf("Error: File is not open in a readable or append mode.\n");
+//         return -1;  // Use a defined error code in practice.
+//     }
+
+//     // Calculate the number of bytes that can actually be read, which may be less than requested.
+//     // int bytes_to_read = min(size, file->entry->size - file->position);
+//     // if (bytes_to_read <= 0) {
+//     //     // If there is no data left to read, return zero.
+//     //     printf("No more data to read from file.\n");
+//     //     return 0;    
+//     // }
+//     int bytes_to_read = 20;
+
+//     // Perform the actual data copying from the file's internal buffer to the provided buffer.
+//     // memcpy(buffer, file->entry->buffer + file->position, bytes_to_read);
+//     uint32_t readOffset = (file->entry->start_block * FILESYSTEM_BLOCK_SIZE);
+//     printf("Read offset: %u\n", readOffset);
+//     printf("sizeof(buffer): %d\n", sizeof(buffer)); 
+
+//     flash_read_safe2(readOffset, (uint8_t*)buffer, size);
+//     // Update the file's current position.
+//     file->position += bytes_to_read;
+//     printf("buffer: %s\n", buffer); 
+
+//     // Provide feedback on how many bytes were read.
+//     printf("Read %d bytes from file '%s'.\n", bytes_to_read, file->entry->filename);
+
+//     // Return the number of bytes read.
+//     return bytes_to_read;
+// }
+
+
+// int fs_read(FS_FILE* file, void* buffer, int size) {
+//     if (file == NULL || buffer == NULL || size <= 0) {
+//         printf("Error: Invalid parameters provided.\n");
+//         return -1;
+//     }
+
+//     if (file->mode != 'r' && file->mode != 'a') {
+//         printf("Error: File is not open in a readable mode.\n");
+//         return -1;
+//     }
+
+//     printf("Reading %d bytes from file '%s'.\n", size, file->entry->filename);
+//     printf("File size: %d\n", file->entry->size);
+//     printf("File position: %d\n", file->position);
+//     printf("File start block: %u\n", file->entry->start_block);
+//     printf("File unique ID: %u\n", file->entry->unique_file_id);
+//     printf("File parent directory ID: %u\n", file->entry->parentDirId);
+//     printf("File is directory: %d\n", file->entry->is_directory);
+//     printf("File in use: %d\n", file->entry->in_use);
+//     printf("File mode: %c\n", file->mode);
+ 
+//     fflush(stdout);
+
+
+//     uint8_t* readBuffer = (uint8_t*)buffer;
+//     int bytesRead = 0;
+//     uint32_t currentBlock = file->entry->start_block;
+//     printf("\nCurrent block: %u\n", currentBlock);
+//     uint32_t blockOffset = file->position % FILESYSTEM_BLOCK_SIZE; // Calculate initial offset within the block
+
+//     while (bytesRead < size && currentBlock != FAT_ENTRY_END) {
+//         uint32_t readOffset = currentBlock * FILESYSTEM_BLOCK_SIZE + blockOffset; // Calculate the physical offset to read from
+//         int spaceInBlock = FILESYSTEM_BLOCK_SIZE - blockOffset; // Remaining space in the current block
+//         int bytesToRead = MIN(spaceInBlock, size - bytesRead); // Determine the number of bytes to read from the current block
+
+//         flash_read_safe2(readOffset, readBuffer + bytesRead, bytesToRead);
+
+//         bytesRead += bytesToRead;
+//         file->position += bytesToRead; // Update the file position
+
+//         // Check if we need to move to the next block
+//         if (bytesToRead == spaceInBlock && bytesRead < size) {
+//             uint32_t nextBlock;
+//             if (fat_get_next_block(currentBlock, &nextBlock) != FAT_SUCCESS) {
+//                 printf("Failed to get next block from block %u.\n", currentBlock);
+//                 break;
+//             }
+//             currentBlock = nextBlock;
+//             blockOffset = 0; // Reset offset for new block
+//         } else {
+//             blockOffset += bytesToRead;
+//         }
+//     }
+
+//     printf("Read %d bytes from file '%s'.\n", bytesRead, file->entry->filename);
+//     return bytesRead;
+// }
+
 int fs_read(FS_FILE* file, void* buffer, int size) {
-    // Validate the file and buffer pointers to ensure they are not NULL.
     if (file == NULL || buffer == NULL) {
         printf("Error: Null file or buffer pointer provided.\n");
-        return -1;  // Use a defined error code in practice.
+        return -1;
     }
 
-    // Validate the request size to ensure it's positive.
-    if (size <= 0) {
-        printf("Error: Invalid size to read (%d).\n", size);
-        return -1;  // Use a defined error code in practice.
+    if (size <= 0 || file->mode != 'r' && file->mode != 'a') {
+        printf("Error: Invalid read request.\n");
+        return -1;
     }
 
-    // Ensure the file is opened in a mode that allows reading.
-    if (file->mode != 'r' && file->mode != 'a') {
-        printf("Error: File is not open in a readable or append mode.\n");
-        return -1;  // Use a defined error code in practice.
+
+        printf("Reading %d bytes from file '%s'.\n", size, file->entry->filename);
+    printf("File size: %d\n", file->entry->size);
+    printf("File position: %d\n", file->position);
+    printf("File start block: %u\n", file->entry->start_block);
+    printf("File unique ID: %u\n", file->entry->unique_file_id);
+    printf("File parent directory ID: %u\n", file->entry->parentDirId);
+    printf("File is directory: %d\n", file->entry->is_directory);
+    printf("File in use: %d\n", file->entry->in_use);
+    printf("File mode: %c\n", file->mode);
+
+    uint32_t currentBlock = file->entry->start_block;
+    uint32_t currentBlockPosition = file->position % FILESYSTEM_BLOCK_SIZE;
+    printf("Current block: %u\n", currentBlock);
+    uint8_t* readBuffer = (uint8_t*)buffer;
+    int totalBytesRead = 0;
+    int remainingSize = size;
+
+    while (remainingSize > 0 && currentBlock != FAT_ENTRY_END) {
+        int bytesToRead = MIN(FILESYSTEM_BLOCK_SIZE - currentBlockPosition, remainingSize);
+        uint32_t readOffset = currentBlock * FILESYSTEM_BLOCK_SIZE + currentBlockPosition;
+
+        flash_read_safe2(readOffset, readBuffer, bytesToRead);
+
+        readBuffer += bytesToRead;
+        totalBytesRead += bytesToRead;
+        remainingSize -= bytesToRead;
+        file->position += bytesToRead;
+    printf("Successfully read from flash, total bytes read: %d, remaining size: %d\n", totalBytesRead, remainingSize);
+        // Update position within block and check if we need to move to next block
+        currentBlockPosition = (file->position % FILESYSTEM_BLOCK_SIZE);
+        if (currentBlockPosition == 0 && remainingSize > 0) {  // We're at the end of a block
+            uint32_t nextBlock;
+            if (fat_get_next_block(currentBlock, &nextBlock) == FAT_SUCCESS && nextBlock != FAT_ENTRY_END) {
+                    printf("Transitioning from block %u to next block %u\n", currentBlock, nextBlock);
+                currentBlock = nextBlock;
+            } else {
+                    printf("End of file chain reached or no next block available. Current block: %u, \n", currentBlock);
+                break;  // No more blocks to read or end of chain reached
+            }
+        }
     }
 
-    // Calculate the number of bytes that can actually be read, which may be less than requested.
-    int bytes_to_read = min(size, file->entry->size - file->position);
-    if (bytes_to_read <= 0) {
-        // If there is no data left to read, return zero.
-        printf("No more data to read from file.\n");
-        return 0;
-    }
-
-    // Perform the actual data copying from the file's internal buffer to the provided buffer.
-    memcpy(buffer, file->entry->buffer + file->position, bytes_to_read);
-
-    // Update the file's current position.
-    file->position += bytes_to_read;
-
-    // Provide feedback on how many bytes were read.
-    printf("Read %d bytes from file '%s'.\n", bytes_to_read, file->entry->filename);
-
-    // Return the number of bytes read.
-    return bytes_to_read;
+    printf("Read %d bytes from file '%s'.\n", totalBytesRead, file->entry->filename);
+    return totalBytesRead;
 }
+
+
+
+
 
 /**
  * Sets the file position indicator for the specified file.
@@ -455,7 +668,7 @@ int fs_cp(const char* source_path, const char* dest_path) {
      // Corrected to use strlen for string copying
     fileCopy->entry->size = oldfile->entry->size;
 
-    memcpy(fileCopy->entry->buffer, oldfile->entry->buffer, sizeof(oldfile->entry->buffer));
+    // memcpy(fileCopy->entry->buffer, oldfile->entry->buffer, sizeof(oldfile->entry->buffer));
 
     // calculate the offset of the file in the flash memory
     uint32_t writeOffset = (fileCopy->entry->start_block * FILESYSTEM_BLOCK_SIZE);

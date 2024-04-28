@@ -466,7 +466,7 @@ void fs_all_files_entries(void) {
             printf("Current file ID: %u\n", fileSystem[i].unique_file_id);
             printf("Start block: %u\n", fileSystem[i].start_block);
             printf("file size: %u\n", fileSystem[i].size);
-            printf("buffer: %s\n", fileSystem[i].buffer);
+            // printf("buffer: %s\n", fileSystem[i].buffer);
             
             fflush(stdout);
         }
@@ -484,7 +484,7 @@ void fs_all_files_entrieszzzz(void) {
             printf("Current file ID: %u\n", fileSystem[i].unique_file_id);
             printf("Start block: %u\n", fileSystem[i].start_block);
             printf("file size: %u\n", fileSystem[i].size);
-            printf("buffer: %s\n", fileSystem[i].buffer);
+            // printf("buffer: %s\n", fileSystem[i].buffer);
             
             fflush(stdout);
     }
@@ -572,3 +572,46 @@ void set_default_path(char* path, const char* default_path) {
         strcpy(path, default_path);
     }
 }
+
+
+ 
+
+
+
+
+//first two blocks reserved for this function
+void saveFileEntriesToFileSystem() {
+    uint32_t address = 262144; 
+    printf("Saving file entries to flash memory...\n");
+    uint8_t *serializedData = malloc(sizeof(fileSystem));  // Assuming fileSystem can be directly serialized
+    memcpy(serializedData, fileSystem, sizeof(fileSystem)); // Simulate serialization if needed
+
+    flash_write_safe2(address, serializedData, sizeof(fileSystem));
+
+    free(serializedData);
+    printf("File entries saved to flash memory.\n");
+}
+
+
+// Function to load file entries from flash memory into a local array
+void loadFileEntriesFromFileSystem() {
+    uint32_t address = 262144; 
+    // Local array to hold the recovered file entries
+    FileEntry recoveredFileSystem[MAX_FILES];
+
+    // Read data from flash into the local array
+    flash_read_safe2(address, (uint8_t*)recoveredFileSystem, sizeof(recoveredFileSystem));
+
+    // Optionally, print out the entries to verify correctness
+    for (int i = 0; i < MAX_FILES; i++) {
+        printf("Recovered File Entry %d: %s\n", i, recoveredFileSystem[i].filename);
+    }
+
+    // Here you can add logic to process the loaded data if needed
+}
+
+
+
+
+
+

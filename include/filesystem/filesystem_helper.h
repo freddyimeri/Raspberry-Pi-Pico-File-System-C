@@ -11,6 +11,8 @@ typedef struct {
     char directory[256];
     char filename[256];
 } PathParts;
+
+
 void set_default_path(char* path, const char* default_path);
 void appendCopyToFilename(char *filename);
 void fs_all_files_entrieszzzz(void);
@@ -29,4 +31,7 @@ FileEntry* createFileEntry(const char* path,  uint32_t parentID );
 void reset_file_content(FileEntry* entry);
 
 FileEntry* FILE_find_file_entry(const char* filename,uint32_t parentID);
+
+void saveFileEntriesToFileSystem();
+void loadFileEntriesFromFileSystem();
 #endif // FILESYSTEM_HELPER_H

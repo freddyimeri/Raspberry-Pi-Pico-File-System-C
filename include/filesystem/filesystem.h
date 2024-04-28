@@ -24,7 +24,7 @@ typedef struct {
     bool in_use;        // Indicates if this file entry is in use
     uint32_t start_block; // Offset in flash memory where the file data starts
     bool is_directory;      // Flag to indicate if this entry is a
-    uint8_t buffer[256];
+    // uint8_t buffer[256];
     uint32_t unique_file_id; 
 } FileEntry;
 

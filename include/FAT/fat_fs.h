@@ -49,4 +49,8 @@ int fat_get_next_block(uint32_t currentBlock, uint32_t* nextBlock);
 // This is crucial for supporting files that span multiple blocks.
 void fat_link_blocks(uint32_t prevBlock, uint32_t nextBlock);
 
+
+void saveFATEntriesToFileSystem();
+void loadFATEntriesFromFileSystem();
+
 #endif // FAT_FS_H

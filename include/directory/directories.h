@@ -19,8 +19,8 @@ typedef struct {
     uint32_t size;        // number of entries (for directories)
     uint32_t start_block; // Start block in flash memory
     bool in_use;  
-    // char buffer[1256];  
 } DirectoryEntry;
+
 
 
 

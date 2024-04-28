@@ -26,7 +26,7 @@ void flash_read_safe_struct(uint32_t offset, flash_data_t *data);
 
 void flash_erase_safe2(uint32_t offset);
 
-
+void flash_write_safe3(uint32_t offset, const uint8_t *data, size_t data_len) ;
 
 
 

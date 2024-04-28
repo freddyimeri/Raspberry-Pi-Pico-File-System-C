@@ -25,6 +25,8 @@
     // the same value as FLASH_TARGET_OFFSET, defined separately for clarity.
     #define FLASH_RESERVED_SPACE FLASH_TARGET_OFFSET 
 
+    
+
     // The maximum number of blocks allowed within the physical limits of the Flash memory.
     // This helps in ensuring we do not attempt to allocate more blocks than physically available.
     #define MAX_ALLOWED_BLOCKS (FLASH_MEMORY_SIZE_BYTES / FILESYSTEM_BLOCK_SIZE)

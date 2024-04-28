@@ -38,11 +38,14 @@
  * constraints of the Raspberry Pi Pico platform and similar microcontroller-based systems.
  */
 
-#include "fat_fs.h"
+#include "../FAT/fat_fs.h"            
 #include <stdio.h>
 #include "hardware/flash.h"   
 #include "pico/mutex.h"
 #include "pico/time.h"
+#include <stdlib.h>
+#include <string.h>
+#include "../flash/flash_ops.h"       
 
 #include "../filesystem/filesystem.h"  
 #include "../config/flash_config.h"    
@@ -66,7 +69,7 @@ void fat_init() {
     }
 
     // Reserve blocks as needed for system use or mark bad blocks
-    for (uint32_t i = 0; i < NUMBER_OF_RESERVED_BLOCKS; i++) {
+    for (uint32_t i = 0; i < NUMBER_OF_RESERVED_BLOCKS + 5; i++) {
         FAT[i] = FAT_ENTRY_RESERVED;
     }
 
@@ -323,3 +326,32 @@ uint32_t fat_allocate_nearest_block(uint32_t hintBlock) {
     fflush(stdout);
     return FAT_NO_FREE_BLOCKS; // Indicate failure to allocate
 }
+
+
+
+
+//first two blocks reserved for this function
+void saveFATEntriesToFileSystem() {
+    uint32_t address = 278528; 
+    printf("Saving file entries to flash memory...\n");
+    uint8_t *serializedData = malloc(sizeof(FAT)); 
+    memcpy(serializedData, FAT, sizeof(FAT)); 
+
+    flash_write_safe2(address, serializedData, sizeof(FAT));
+
+    free(serializedData);
+    printf("File entries saved to flash memory.\n");
+}
+
+
+// Function to load file entries from flash memory into a local array
+void loadFATEntriesFromFileSystem() {
+    uint32_t address = 278528; 
+    // Local array to hold the recovered file entries
+    uint32_t recoverFAT[TOTAL_BLOCKS];
+
+    // Read data from flash into the local array
+    flash_read_safe2(address, (uint8_t*)recoverFAT, sizeof(recoverFAT));
+}
+
+

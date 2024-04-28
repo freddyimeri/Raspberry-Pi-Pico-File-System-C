@@ -187,3 +187,38 @@ bool is_directory_valid(const DirectoryEntry* directory) {
  
     return true;
 }
+
+
+
+
+//first two blocks reserved for this function
+void saveDirectoriesEntriesToFileSystem() {
+    uint32_t address = 270336; 
+    printf("Saving file entries to flash memory...\n");
+    uint8_t *serializedData = malloc(sizeof(dirEntries)); 
+    memcpy(serializedData, dirEntries, sizeof(dirEntries)); 
+
+    flash_write_safe2(address, serializedData, sizeof(dirEntries));
+
+    free(serializedData);
+    printf("File entries saved to flash memory.\n");
+}
+
+
+// Function to load file entries from flash memory into a local array
+void loadDirectoriesEntriesFromFileSystem() {
+    uint32_t address = 270336; 
+    // Local array to hold the recovered file entries
+    DirectoryEntry recoverDirSystem[MAX_DIRECTORY_ENTRIES];
+
+    // Read data from flash into the local array
+    flash_read_safe2(address, (uint8_t*)recoverDirSystem, sizeof(recoverDirSystem));
+
+    // Optionally, print out the entries to verify correctness
+    for (int i = 0; i < MAX_FILES; i++) {
+        printf("Recovered File Entry %d: %s\n", i, recoverDirSystem[i].name);
+    }
+
+    // Here you can add logic to process the loaded data if needed
+}
+

@@ -6,9 +6,15 @@
  #include <stdlib.h>
 #include "../filesystem/filesystem.h"  
 #include "../filesystem/filesystem_helper.h"  
-
+#include "../FAT/fat_fs.h"   
 #include "../directory/directories.h"
 #include "../directory/directory_helpers.h"
+
+#ifndef min
+#define min(a,b) ((a) < (b) ? (a) : (b))
+#endif
+ 
+void review_block(uint32_t first_block);
 
 
 
@@ -33,9 +39,7 @@ int main() {
         sleep_ms(1000);
     }
 
-   printf("Starting Filesystem Test...\n");
-
-  // Open a file for writing
+    // Open a file for writing
     FS_FILE* file = fs_open("/root/testfile.txt", "w");
     if (!file) {
         printf("Failed to open file for writing.\n");
@@ -43,74 +47,92 @@ int main() {
     }
     printf("File opened for writing.\n");
 
-    // Write initial data to the file
-    const char* data = "Hello, Pi Pico!";
-    if (fs_write(file, data, strlen(data)) < 0) {
-        printf("Failed to write to file.\n");
+    // Prepare data to write
+    const char* baseData = "Hello, Pi Pico! This is a test of the FAT file system handling in embedded systems.";
+    int baseDataLength = strlen(baseData);
+    int dataSize = 18006;  // Size to demonstrate spanning multiple blocks
+
+    char* data = malloc(dataSize + 1);  // +1 for null terminator
+    if (!data) {
+        printf("Failed to allocate memory for data.\n");
         fs_close(file);
         return -1;
     }
-    printf("Data written to file: %s\n", data);
 
-    // Close the file
+    // Fill the data buffer with repeated base data
+    for (int i = 0; i < dataSize; i += baseDataLength) {
+        strncpy(data + i, baseData, MIN(baseDataLength, dataSize - i));
+    }
+    data[dataSize] = '\0';  // Null-terminate the data
+
+    // Write data to the file
+    int bytesWritten = fs_write(file, data, dataSize);
+    if (bytesWritten < 0) {
+        printf("Failed to write to file.\n");
+        free(data);
+        fs_close(file);
+        return -1;
+    }
+    printf("Data written to the file: %d bytes.\n", bytesWritten);
+
+    // Close the file after writing
     fs_close(file);
     printf("File closed after writing.\n");
+    /////////////////////////////////////
+    printf("\n\n\nFile Entries :\n");
+    fs_all_files_entries();
 
-    // Open the file for appending
-    file = fs_open("/root/testfile.txt", "a");
-    if (!file) {
-        printf("Failed to open file for appending.\n");
-        return -1;
-    }
+    printf("\n\n\nFile Entries :\n");
 
-    // Seek to the end of the file before appending
-    if (fs_seek(file, 0, SEEK_END) != 0) {
-        printf("Failed to seek to end of file.\n");
-        fs_close(file);
-        return -1;
-    }
-
-    // Append data
-    const char* moreData = " Welcome to the RP2040!";
-    if (fs_write(file, moreData, strlen(moreData)) < 0) {
-        printf("Failed to append to file.\n");
-        fs_close(file);
-        return -1;
-    }
-    printf("Appended data: %s\n", moreData);
-
-    // Close the file
-    fs_close(file);
-    printf("File closed after appending.\n");
-
-    // Open the file again to read
+   
     file = fs_open("/root/testfile.txt", "r");
     if (!file) {
         printf("Failed to open file for reading.\n");
+        free(data);
         return -1;
     }
+    printf("File opened for reading.\n");
 
-    // Seek to the beginning of the file to start reading
-    if (fs_seek(file, 0, SEEK_SET) != 0) {
-        printf("Failed to seek to start of file.\n");
+
+     ///////////////////////////////////
+    printf("\n\nREVIEW BLOCKS\n");
+    review_block(file->entry->start_block);
+    printf("\nREVIEW BLOCKS\n\n\n\n");
+    ///////////////////////////////
+    ///////////////////////////
+    // Re-open the file for reading
+
+
+
+    // Buffer to read back the data
+    char* readData = malloc(dataSize + 1);
+    // int dataSizessssss = 2096;  // Size to demonstrate spanning multiple blocks
+    // char* readData = malloc(dataSizessssss + 1);
+    if (!readData) {
+        printf("Failed to allocate memory for reading data.\n");
+        free(data);
         fs_close(file);
         return -1;
     }
 
-    // Read the content of the file
-    char buffer[128];
-    int bytesRead = fs_read(file, buffer, sizeof(buffer)-1);
+    // Read back the data
+    int bytesRead = fs_read(file, readData, dataSize);
+    // int bytesRead = fs_read(file, readData, dataSizessssss);
+
     if (bytesRead < 0) {
         printf("Failed to read from file.\n");
-        fs_close(file);
-        return -1;
+    } else {
+        readData[bytesRead] = '\0';  // Null-terminate the read data
+        printf("Data read from the file: %d bytes.\n", bytesRead);
+        // Uncomment below to print the read data
+        printf("Read data: %s\n", readData);
     }
 
-    buffer[bytesRead] = '\0'; // Ensure the buffer is null-terminated
-    printf("Read data: %s\n", buffer);
-
-    // Close the file
+    // Clean up
+    free(data);
+    free(readData);
     fs_close(file);
+ 
     printf("File closed after reading.\n");
     for (int i = 5; i >= 1; i--) {
         printf("Program Finishes in : %d Seconds\n", i);
@@ -133,3 +155,27 @@ int main() {
 
 
  
+
+
+
+
+// Function to create a file with 'num_blocks' blocks
+void review_block(uint32_t first_block) {
+ 
+        // Print the structure of the file
+    printf("File blocks:");
+    uint32_t block = first_block;
+    while (block != FAT_ENTRY_END) {
+        printf(" %u ->", block);
+        uint32_t next;
+        if (fat_get_next_block(block, &next) != FAT_SUCCESS) {
+            printf(" Error retrieving block.");
+            break;
+        }
+        block = next;
+    }
+    printf(" END\n");
+}
+
+
+

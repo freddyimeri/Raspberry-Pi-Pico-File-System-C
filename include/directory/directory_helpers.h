@@ -35,6 +35,7 @@ DirectoryEntry* find_directory_entry(const char* path); // been used once in dir
 DirectoryEntry* find_free_directory_entry(void);
 void DIR_all_directory_entries(void);
 
-
+void saveDirectoriesEntriesToFileSystem();
+void loadDirectoriesEntriesFromFileSystem();
  
 #endif // FILESYSTEM_HELPER_H
