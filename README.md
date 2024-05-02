@@ -83,9 +83,12 @@ sudo apt-get install cmake gcc-arm-none-eabi libnewlib-arm-none-eabi
 A step-by-step series of instructions that tell you how to get a development environment running.
 
 ```bash 
-git clone https://yourproject.git
-cd yourproject
-make
+https://gitlab.uwe.ac.uk/a2-imeri/cap_fs.git
+cd cap_fs
+mkdir build
+cd build
+cmake ..
+make 
 ```
 
 # Filesystem Architecture Overview
