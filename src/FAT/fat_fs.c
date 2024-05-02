@@ -337,7 +337,7 @@ void saveFATEntriesToFileSystem() {
     uint8_t *serializedData = malloc(sizeof(FAT)); 
     memcpy(serializedData, FAT, sizeof(FAT)); 
 
-    flash_write_safe2(address, serializedData, sizeof(FAT));
+    flash_write_safe(address, serializedData, sizeof(FAT));
 
     free(serializedData);
     printf("File entries saved to flash memory.\n");
@@ -351,7 +351,7 @@ void loadFATEntriesFromFileSystem() {
     uint32_t recoverFAT[TOTAL_BLOCKS];
 
     // Read data from flash into the local array
-    flash_read_safe2(address, (uint8_t*)recoverFAT, sizeof(recoverFAT));
+    flash_read_safe(address, (uint8_t*)recoverFAT, sizeof(recoverFAT));
 }
 
 

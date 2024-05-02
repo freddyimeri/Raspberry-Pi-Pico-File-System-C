@@ -15,11 +15,9 @@ typedef struct {
 
 void set_default_path(char* path, const char* default_path);
 void appendCopyToFilename(char *filename);
-void fs_all_files_entrieszzzz(void);
 void construct_full_path(const char* directory, const char* filename, char* full_path, size_t max_size);
-// void process_file_creation(const char* path);
-FS_FILE* process_file_creation(const char* path);
-void fs_all_files_entries(void);
+ 
+ 
 void prepend_slash(const char* path, char* buffer, size_t buffer_size);
 PathParts extract_last_two_parts(const char* fullPath);
 int find_file_entry_by_name(const char* filename);

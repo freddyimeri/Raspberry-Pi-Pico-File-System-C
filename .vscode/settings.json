@@ -20,6 +20,10 @@
         "filesystem_helper.h": "c",
         "directory_helpers.h": "c",
         "limits": "c",
-        "typeinfo": "c"
+        "typeinfo": "c",
+        "flash_ops_test.h": "c",
+        "flash_ops_helper.h": "c",
+        "filesystem_test.h": "c",
+        "visual.h": "c"
     }
 }

@@ -19,26 +19,39 @@
 
 static int random_initialized = 0;  // Flag to check if random generator has been initialized
 
- 
-
-
-
- 
-
+  
+/**
+ * Prepends a forward slash to a given path if it does not already start with one.
+ * This is useful for ensuring that path strings are treated as absolute paths
+ * in the filesystem. The function modifies the provided buffer to include
+ * the leading slash and ensures the resulting string is null-terminated.
+ *
+ * @param path The input path that might need a leading slash.
+ * @param buffer A buffer where the modified path should be stored.
+ * @param buffer_size The size of the buffer to ensure safe string operations.
+ *
+ * This function performs the following operations:
+ * 1. Validates the input parameters to ensure they are not NULL and that the buffer size is adequate.
+ * 2. Checks if the path already starts with a slash and, if so, copies the path directly to the buffer.
+ * 3. If the path does not start with a slash, it prepends one to the path and then copies the result to the buffer.
+ * 4. Ensures that the buffer is null-terminated to prevent buffer overflow issues.
+ */
 void prepend_slash(const char* path, char* buffer, size_t buffer_size) {
     if (path == NULL || buffer == NULL || buffer_size == 0) {
-        return; // Safety check for null pointers and non-zero size
+        return; // Early exit if input parameters are invalid (safety check).
     }
 
     if (path[0] == '/') {
-        // The path already starts with a slash, just copy it.
+        // If the path already starts with a slash, directly copy the path to the buffer.
         strncpy(buffer, path, buffer_size);
     } else {
-        // Prepend a slash to the path.
+        // If the path does not start with a slash, prepend one using snprintf.
         snprintf(buffer, buffer_size, "/%s", path);
     }
-    buffer[buffer_size - 1] = '\0'; // Ensure null termination
+    // Manually set the last character in the buffer to '\0' to ensure the string is null-terminated.
+    buffer[buffer_size - 1] = '\0';
 }
+
 
 
 
@@ -65,96 +78,123 @@ int find_file_entry_by_name(const char* filename) {
 }
 
 
-int find_file_existance(const char* filename,  uint32_t parentID ) {
+/**
+ * Checks for the existence of a file within a filesystem based on its name and parent directory ID.
+ * 
+ * This function searches through the global filesystem array to find a file that matches
+ * both the provided filename and parent directory identifier. It also ensures the filename
+ * starts with a slash for consistency in comparisons.
+ *
+ * @param filename The name of the file to search for, which may not initially include a leading slash.
+ * @param parentID The identifier of the parent directory in which the file is supposed to exist.
+ * @return Returns 0 if the file is found, -1 if not found or if there is an error (e.g., NULL filename).
+ */
+int find_file_existance(const char* filename, uint32_t parentID) {
+    // Define a sufficiently large buffer for the path to accommodate the filename with a leading slash.
+    char path[1024];
 
-    char path[1024]; // Define a sufficiently large buffer for the path
+    // Prepend a slash to the filename to ensure consistent formatting in the filesystem.
     prepend_slash(filename, path, sizeof(path));
-    
+
+    // Check if the filename after modification is NULL, which should never be true given the buffer handling.
     if (path == NULL) {
-        printf("Error: Filename is NULL.\n");
+        printf("Error: Filename processing failed or filename is NULL.\n");
         return -1;
     }
 
+    // Loop through all file entries in the global file system array to find a match.
     for (int i = 0; i < MAX_FILES; i++) {
-        if (fileSystem[i].in_use && strcmp(fileSystem[i].filename, path) == 0 && fileSystem[i].parentDirId == parentID) {   
+        // Check if the current file entry is in use and matches both the filename and parent directory ID.
+        if (fileSystem[i].in_use && strcmp(fileSystem[i].filename, path) == 0 && fileSystem[i].parentDirId == parentID) {
+            // If a matching file is found, print its details and return 0.
             printf("File found: %s at index %d\n", path, i);
-            return 0;
+            return 0;  // File exists
         }
     }
 
+    // If no matching file is found after checking all entries, print a not found message and return -1.
     printf("File not found: %s\n", path);
-    return -1; // File not found
+    return -1;  // File not found
 }
 
 
 
 
-// Function to initialize random number generation
+
+/**
+ * Initializes the random number generator by using ADC noise as a seed.
+ * This function sets up the ADC (Analog to Digital Converter) to read an unconnected input,
+ * utilizing the electrical noise from this input as a seed for the random number generator,
+ * ensuring more unpredictability in the generated values.
+ */
 void init_random() {
+    // Check if the random number generator has already been initialized.
     if (!random_initialized) {
-        adc_init();
-        adc_select_input(0);  // Select an unconnected ADC input for noise
+        adc_init();  // Initialize the ADC hardware to prepare for reading.
+        adc_select_input(0);  // Select ADC input channel 0, assuming it is unconnected and noisy.
 
-        // Read an analog value for seeding the random number generator
+        // Read an analog value from the selected ADC channel to use as a seed.
         uint16_t noise = adc_read();
-        srand(noise);
+        srand(noise);  // Seed the standard random number generator with the ADC noise value.
 
-        random_initialized = 1;  // Set the initialized flag
+        random_initialized = 1;  // Set the flag indicating the random generator is initialized.
     }
 }
 
-// Function to generate a unique number between 1000 and 4,294,967,294 (one less than uint32_t max)
+/**
+ * Generates a unique ID number within a specific range by utilizing the standard
+ * C library random function, which has been seeded by ADC noise.
+ *
+ * @return A unique ID number between 1000 and 4294967294 (0xFFFFFFFE), ensuring
+ *         the ID is not less than 1000.
+ */
 uint32_t generateUniqueId() {
+    // Ensure the random number generator is properly initialized before generating a number.
     if (!random_initialized) {
-        init_random();  // Ensure random number generator is initialized
+        init_random();  // Initialize the random number generator if not already done.
     }
-    // Calculate a range from 1000 to 4,294,967,294
-    uint32_t range = 4294967294u - 1000 + 1;
+
+    // Define the range of the unique ID to be generated, from 1000 to uint32_t's maximum value minus one.
+    uint32_t range = 4294967294u - 1000 + 1;  // Compute the total number of possible values.
+
+    // Generate a random number within the defined range and adjust by adding 1000 to shift the start.
     return rand() % range + 1000;
 }
 
 
 
 
-int find_file_entry_by_unique_file_id(uint32_t unique_file_id) {
 
+/**
+ * Searches for a file entry in the global fileSystem array by a unique identifier.
+ * This function iterates through the fileSystem array, checking each entry to see if it is in use
+ * and if its unique identifier matches the one provided.
+ *
+ * @param unique_file_id The unique identifier of the file to locate.
+ * @return The index of the file in the fileSystem array if found, or -1 if no matching file is found.
+ */
+int find_file_entry_by_unique_file_id(uint32_t unique_file_id) {
+    // Iterate over each file entry in the global fileSystem array.
     for (int i = 0; i < MAX_FILES; i++) {
+        // Check if the current file entry is in use and if the unique ID matches the one being searched for.
         if (fileSystem[i].in_use && fileSystem[i].unique_file_id == unique_file_id) {
+            // If a match is found, print the index at which the file is located for verification.
             printf("File found at index %d\n", i);
             
+            // Return the index of the file entry, indicating where it was found.
             return i;
         }
     }
 
+    // If no file with the given unique ID is found after checking all entries, print a message to indicate this.
     printf("File not found:\n");
-    return -1; // File not found
+    return -1; // Return -1 to indicate that the file was not found in the file system.
 }
 
 
 
 
-
-// FS_FILE* process_file_creation(const char* path) {
-//     printf("Attempting to process file creation for: %s\n", path);
-//     FileEntry* fileEntry = FILE_find_file_entry(path);
-    
-//     if (fileEntry) {
-//         printf("File '%s' already exists. No need to create.\n", path);
-//         free(fileEntry); // Assuming fileEntry was dynamically allocated
-//         return NULL; // Return NULL or you could return an existing handle if appropriate
-//     } else {
-//         printf("File '%s' does not exist. Creating file...\n", path);
-//         FS_FILE* fileHandle = fs_open(path, "w");
-//         printf("File handle: %p\n", fileHandle);
-//         if (fileHandle) {
-//             printf("File '%s' created and opened successfully.\n", path);
-//             return fileHandle; // Return the handle to the newly opened file
-//         } else {
-//             printf("Failed to create and open file '%s'.\n", path);
-//             return NULL; // Return NULL to indicate failure
-//         }
-//     }
-// }
+ 
 
 
 
@@ -164,6 +204,13 @@ int find_file_entry_by_unique_file_id(uint32_t unique_file_id) {
  * @return Pointer to the created FileEntry or NULL if creation fails.
  */
 FileEntry* createFileEntry(const char* path,  uint32_t parentDirId) {
+    if (path == NULL) {
+        printf("Error: Path is NULL.\n");
+        return NULL;
+    }// if no parent directory is provided, default to root directory
+    if (parentDirId == 0) {
+        parentDirId = get_root_directory_id();
+    }
     printf("debug createFileEntry for path: %s\n", path);
     sleep_ms(1000);
 
@@ -246,153 +293,42 @@ void reset_file_content(FileEntry* entry) {
 
 
 
-FileEntry* FILE_find_file_entry(const char* filename,  uint32_t parentID) {
-     char newfilename[512]; // Define a sufficiently large buffer for the path
-    prepend_slash(filename, newfilename, sizeof(newfilename));
-    
-    printf("\n\nENTERED FILE_find_file_entry\n");
+/**
+ * Searches for a file entry in the global filesystem based on the filename and its parent directory ID.
+ * This function formats the filename to ensure it has a leading slash, then checks each file entry
+ * in the global file system to find a match that is not a directory.
+ *
+ * @param filename The name of the file to search for. It may not initially include a leading slash.
+ * @param parentID The identifier of the parent directory in which the file is supposed to exist.
+ * @return Pointer to the FileEntry if found, or NULL if no matching file is found.
+ */
+FileEntry* FILE_find_file_entry(const char* filename, uint32_t parentID) {
+    // Define a sufficiently large buffer to modify the filename with a leading slash.
+    char newfilename[512];
+    prepend_slash(filename, newfilename, sizeof(newfilename));  // Ensure the filename starts with a slash for consistent comparison.
+
+    // Log entering the function and what file is being searched for to help with debugging.
     printf("Searching for file entry: %s\n", newfilename);
-    fflush(stdout);
-     for (int i = 0; i < MAX_FILES; i++) {
+    fflush(stdout);  // Flush stdout to ensure the log message is displayed immediately.
+
+    // Iterate through all file entries in the global file system array.
+    for (int i = 0; i < MAX_FILES; i++) {
+        // Check if the current file entry is active, not a directory, matches the filename, and belongs to the correct parent directory.
         if (fileSystem[i].in_use && !fileSystem[i].is_directory 
-        && strcmp(fileSystem[i].filename, newfilename) == 0
-        && fileSystem[i].parentDirId == parentID) {
+            && strcmp(fileSystem[i].filename, newfilename) == 0
+            && fileSystem[i].parentDirId == parentID) {
+            // If a matching file is found, print a confirmation message and return a pointer to the file entry.
             printf("File entry found: %s\n", newfilename);
-            fflush(stdout);
+            fflush(stdout);  // Ensure the output is displayed immediately.
             return &fileSystem[i];
         }
     }
-    return NULL;
 
+    // If no matching file is found after checking all entries, return NULL.
+    return NULL;
 }
 
-
-
-
-// FileEntry* FILE_find_file_entry(const char* filename) {
-//     const char* newfilename = prepend_slash(filename);
-//     printf("\n\nENTERED FILE_find_file_entry\n");
-//     fflush(stdout);
-
-//     for (uint32_t i = 0; i < TOTAL_BLOCKS; i++) {
-//         if (FAT[i] == FAT_ENTRY_END) {
-//             printf("Checking block %u\n", i);
-//             fflush(stdout);
-
-//             uint32_t address = i * FILESYSTEM_BLOCK_SIZE;
-//             FileEntry fileEntry;  // Temporary storage
-//             flash_read_safe2(address, (uint8_t *)&fileEntry, sizeof(FileEntry));
-
-//             printf("Checking file name: %s\n", fileEntry.filename);
-//             printf("Checking file size: %u\n", fileEntry.size);
-//             printf("Checking file start block: %u\n", fileEntry.start_block);
-//             printf("Checking file in_use: %d\n", fileEntry.in_use);
-//             printf("Checking if directory flag: %d\n", fileEntry.is_directory);
-//             printf("buffer: %s\n", fileEntry.buffer);
-//             fflush(stdout);
-            
-//             if (fileEntry.in_use && !fileEntry.is_directory && strcmp(fileEntry.filename, newfilename) == 0) {
-//                 printf("File entry found: %s\n", newfilename);
-//                 fflush(stdout);
-//                 FileEntry* result = malloc(sizeof(FileEntry));  // Dynamically allocate memory
-//                 if (result) {
-//                     *result = fileEntry;  // Copy the data
-//                     return result;
-//                 } else {
-//                     printf("Memory allocation failed.\n");
-//                     fflush(stdout);
-//                     return NULL;
-//                 }
-//             }
-//             sleep_ms(200);
-//         }
-//     }
-
-//     printf("File entry not found: %s\n", filename);
-//     fflush(stdout);
-//     return NULL;
-// }
-
-
-
-
-//  //updated
-// FileEntry* FILE_find_file_entry(const char* filename) {
-//     if (filename == NULL) {
-//         printf("Error: Filename is NULL.\n");
-//         fflush(stdout);
-//         return NULL;
-//     }
-
-//     const char* newfilename = prepend_slash(filename);  // Ensure filename starts with a '/'
-//     printf("Searching for file entry: %s\n", newfilename);
-//     fflush(stdout);
-
-//     for (uint32_t i = 0; i < TOTAL_BLOCKS; i++) {
-//         if (FAT[i] == FAT_ENTRY_END) {  // Check if the block is marked as the end of a file entry
-//             uint32_t address = i * FILESYSTEM_BLOCK_SIZE;
-//             FileEntry fileEntry;  // Temporary storage
-//             flash_read_safe2(address, (uint8_t *)&fileEntry, sizeof(FileEntry));  // Read the file entry from flash
-
-//             if (fileEntry.in_use && !fileEntry.is_directory && strcmp(fileEntry.filename, newfilename) == 0) {
-//                 printf("File entry found: %s at block %u\n", newfilename, i);
-//                 fflush(stdout);
-//                 return &fileSystem[i];  // Return a pointer to the file entry in the global file system array
-//             }
-//         }
-//     }
-
-//     printf("File entry not found: %s\n", newfilename);
-//     fflush(stdout);
-//     return NULL;  // Return NULL if no entry is found
-// }
-
-
- 
-
-
-// PathParts extract_last_two_parts(const char* fullPath) {
-//     PathParts parts;
-//     memset(&parts, 0, sizeof(parts));
-
-//     printf("Attempting to extract last two parts from: %s\n", fullPath);
-//     if (fullPath == NULL) {
-//         printf("Input path is NULL.\n");
-//         return parts; // Return empty parts if the input is NULL
-//     }
-
-//     // Use strrchr to find the last occurrence of '/'
-//     const char* lastSlash = strrchr(fullPath, '/');
-//     if (!lastSlash) { // If there's no '/', the path is just a filename
-//         printf("Only a filename provided without directory path.\n");
-//         strcpy(parts.filename, fullPath); // Assume the entire path is the filename
-//         printf("Extracted file name: %s\n", parts.filename);
-//         return parts;
-//     }
-
-//     // If we found a '/', copy the filename after the '/'
-//     strcpy(parts.filename, lastSlash + 1);
-//     printf("Extracted file name: %s\n", parts.filename);
-
-//     // To find the directory just before the filename:
-//     // We make a copy of the path to manipulate
-//     char pathCopy[256];
-//     strncpy(pathCopy, fullPath, lastSlash - fullPath);
-//     pathCopy[lastSlash - fullPath] = '\0'; // Null-terminate at the last '/'
-
-//     // Now find the last '/' in the modified copy
-//     const char* secondLastSlash = strrchr(pathCopy, '/');
-//     if (secondLastSlash) {
-//         strcpy(parts.directory, secondLastSlash + 1); // Copy the directory name
-//     } else {
-//         strcpy(parts.directory, pathCopy); // If no second '/', the directory is the whole modified path
-//     }
-
-//     printf("Extracted directory: %s\n", parts.directory);
-//     return parts;
-// }
-
-
+  
 
 /**
  * Extracts the last two components of a given file path: the directory and the filename.
@@ -403,174 +339,151 @@ FileEntry* FILE_find_file_entry(const char* filename,  uint32_t parentID) {
  */
 PathParts extract_last_two_parts(const char* fullPath) {
     PathParts parts;
-    memset(&parts, 0, sizeof(parts)); // Initialize the parts structure to zero.
+    // Initialize the parts structure to zero to ensure all fields start clean.
+    memset(&parts, 0, sizeof(parts));
 
-
-    // Check if the input path is NULL, which is an error condition.
+    // Check for a NULL input which is an error condition for this function.
     if (fullPath == NULL) {
         printf("Input path is NULL.\n");
-        return parts; // Return empty parts if the input is NULL.
+        return parts; // Early return with empty parts structure if the input path is NULL.
     }
 
-    // Use strrchr to find the last occurrence of '/'
+    // Find the last occurrence of '/' which separates the filename from the rest of the path.
     const char* lastSlash = strrchr(fullPath, '/');
-    if (!lastSlash) { // If there's no '/', the path is just a filename
-        char path[512]; // Define a sufficiently large buffer for the path
-        prepend_slash(fullPath, path, sizeof(path));
-        strcpy(parts.filename, path); // Assume the entire path is the filename.
-        return parts; // Return the parts with only the filename filled.
+    if (!lastSlash) {
+        // If no slash is found, it implies that the fullPath is just a filename.
+        char path[512]; // Buffer to ensure we have enough space for manipulation.
+        prepend_slash(fullPath, path, sizeof(path)); // Prepend a slash to indicate it as a full path.
+        strcpy(parts.filename, path); // Copy the modified path as the filename in the structure.
+        return parts; // Return the structure with only the filename populated.
     }
 
-     if (lastSlash[1] == '\0') {
-            strcpy(parts.filename, lastSlash + 1);
-        }else{
-            strcpy(parts.filename, lastSlash );
+    // Check if the last character is '/', indicating the path ends with a directory.
+    if (lastSlash[1] == '\0') {
+        // When the path ends with '/', consider there's no filename component.
+        strcpy(parts.filename, lastSlash + 1); // Copy an empty string to the filename.
+    } else {
+        // Otherwise, copy the portion after the last '/' as the filename.
+        strcpy(parts.filename, lastSlash + 1);
     }
 
- 
-
-    // Copy the path up to the last slash into a temporary buffer to extract the directory.
+    // Create a copy of the path to manipulate and isolate the directory part.
     char pathCopy[256];
-    strncpy(pathCopy, fullPath, lastSlash - fullPath); // Copy the part before the last slash.
-    pathCopy[lastSlash - fullPath] = '\0'; // Null-terminate the copied part.
+    // Copy up to the last slash to get the directory path.
+    strncpy(pathCopy, fullPath, lastSlash - fullPath);
+    pathCopy[lastSlash - fullPath] = '\0'; // Null-terminate the directory path.
 
-
-    // Find the last '/' in the temporary copy to extract the directory name.
+    // Find the slash before the last slash to isolate the parent directory.
     const char* secondLastSlash = strrchr(pathCopy, '/');
     if (secondLastSlash) {
+        // If found, there's a directory name before the filename.
         if (secondLastSlash[1] == '\0') {
+            // If the directory part ends with '/', it's an empty directory name.
             strcpy(parts.directory, secondLastSlash + 1);
-        }else{
-            char Dirpath[512]; // Define a sufficiently large buffer for the path
-            prepend_slash(secondLastSlash + 1, Dirpath, sizeof(Dirpath));
-            strcpy(parts.directory, Dirpath);
+        } else {
+            // Copy the directory part after the second last slash, ensuring it starts with a slash.
+            char Dirpath[512]; // Buffer for the directory path.
+            prepend_slash(secondLastSlash + 1, Dirpath, sizeof(Dirpath)); // Ensure it starts with '/'
+            strcpy(parts.directory, Dirpath); // Copy the prepared directory path to the structure.
         }
-        
     } else {
-        // If there's no second last slash, the entire modified path is the directory.
+        // If there's no second last slash, use the entire path as the directory.
         strcpy(parts.directory, pathCopy);
     }
 
-    return parts; // Return the populated parts structure.
+    return parts; // Return the structure populated with the directory and filename.
 }
 
 
-
-void fs_all_files_entries(void) {
-    printf("\n\nENTERED fs_all_files_entries\n");
-    for (int i = 0; i < MAX_FILES; i++) {
-        if (fileSystem[i].in_use && !fileSystem[i].is_directory) {
-            printf("\n\nEnrty %d is a directory\n", i);
-            printf("file entry %d: %s\n", i, fileSystem[i].filename);
-            printf("Parent file ID: %u\n", fileSystem[i].parentDirId);
-            printf("Current file ID: %u\n", fileSystem[i].unique_file_id);
-            printf("Start block: %u\n", fileSystem[i].start_block);
-            printf("file size: %u\n", fileSystem[i].size);
-            // printf("buffer: %s\n", fileSystem[i].buffer);
-            
-            fflush(stdout);
-        }
-    }
-}
+ 
 
 
-
-void fs_all_files_entrieszzzz(void) {
-    printf("\n\nENTERED fs_all_files_entries\n");
-    for (int i = 0; i < 5; i++) {
-            printf("\n\nEnrty I is : %d \n", i);
-            printf("file entry %d: %s\n", i, fileSystem[i].filename);
-            printf("Parent file ID: %u\n", fileSystem[i].parentDirId);
-            printf("Current file ID: %u\n", fileSystem[i].unique_file_id);
-            printf("Start block: %u\n", fileSystem[i].start_block);
-            printf("file size: %u\n", fileSystem[i].size);
-            // printf("buffer: %s\n", fileSystem[i].buffer);
-            
-            fflush(stdout);
-    }
-}
+ 
 
 
-
-
-
-// /**
-//  * Modifies the destination filename to include "Copy" before the extension
-//  * or at the end if there is no extension.
-//  * 
-//  * @param source_filename The original filename.
-//  * @param dest_filename The buffer for the destination filename, modified in-place.
-//  * @param dest_size The size of the destination buffer.
-//  */
-// void appendCopyToFilename(const char* source_filename, char* dest_filename, size_t dest_size) {
-//     const char* lastDot = strrchr(source_filename, '.');
-//     if (lastDot) {
-//         // There's an extension. Copy up to the dot.
-//         int basenameLength = lastDot - source_filename;
-//         if (basenameLength + 5 + strlen(lastDot) >= dest_size) {  // +5 for "Copy" and null terminator
-//             fprintf(stderr, "Error: Destination buffer too small to hold modified filename.\n");
-//             return;
-//         }
-        
-//         // Copy the base part of the filename
-//         strncpy(dest_filename, source_filename, basenameLength);
-//         dest_filename[basenameLength] = '\0';
-        
-//         // Append "Copy" and then the extension
-//         strcat(dest_filename, "Copy");
-//         strcat(dest_filename, lastDot);
-//     } else {
-//         // No extension found, just append "Copy".
-//         if (strlen(source_filename) + 5 >= dest_size) {  // +5 for "Copy" and null terminator
-//             fprintf(stderr, "Error: Destination buffer too small to hold modified filename.\n");
-//             return;
-//         }
-//         snprintf(dest_filename, dest_size, "%sCopy", source_filename);
-//     }
-// }
-
-
+/**
+ * Appends "Copy" to the provided filename, maintaining the file extension if present.
+ * This function is useful when creating a duplicate file while preserving the original's extension,
+ * avoiding filename conflicts in the file system.
+ *
+ * @param filename A pointer to the string containing the original filename which may or may not
+ *                 include a file extension.
+ */
 void appendCopyToFilename(char *filename) {
-    char temp[256]; // Temporary buffer to hold the new filename
+    char temp[256]; // Temporary buffer to hold the modified filename with "Copy" appended
+
+    // Search for the last dot in the filename, which usually starts the file extension
     const char *lastDot = strrchr(filename, '.');
     if (lastDot) {
-        // There's an extension. Copy up to the dot.
-        int basenameLength = lastDot - filename;
-        strncpy(temp, filename, basenameLength);
-        temp[basenameLength] = '\0';  // Null-terminate after the basename
+        // If a dot is found, there is an extension in the filename.
+        int basenameLength = lastDot - filename; // Calculate the length of the name part before the dot
+        strncpy(temp, filename, basenameLength); // Copy the base part of the filename up to the dot
+        temp[basenameLength] = '\0';  // Null-terminate the base part
 
-        // Append "Copy" and then the extension.
+        // Append "Copy" followed by the original extension to the base filename
         snprintf(temp + basenameLength, sizeof(temp) - basenameLength, "Copy%s", lastDot);
     } else {
-        // No extension found, just append "Copy".
+        // No dot found, implying no extension; append "Copy" directly to the end of the filename
         snprintf(temp, sizeof(temp), "%sCopy", filename);
     }
 
-    // Safely copy back the new filename to the original buffer
+    // Copy the modified filename back to the original filename buffer
     strncpy(filename, temp, 256);
-    filename[255] = '\0'; // Ensure null termination in case of overflow
+    filename[255] = '\0'; // Ensure the string is null-terminated to prevent buffer overflow issues
 }
 
 
+
+/**
+ * Constructs a full path from a directory and a filename by ensuring proper path formatting.
+ * This function safely concatenates the directory and filename, adding a necessary slash if
+ * the directory does not already end with one, to form a valid filesystem path.
+ *
+ * @param directory The directory path as a string. It should not be NULL.
+ * @param filename The filename to append to the directory path. It should not be NULL.
+ * @param full_path A buffer to store the resultant full path. It should not be NULL.
+ * @param max_size The maximum size of the buffer to ensure the resultant path does not exceed
+ *                 buffer capacity.
+ */
 void construct_full_path(const char* directory, const char* filename, char* full_path, size_t max_size) {
+    // Return immediately if any input pointers are NULL, to avoid dereferencing NULL.
     if (directory == NULL || filename == NULL || full_path == NULL) return;
 
-    // Ensure the directory path ends with a slash if it's not empty
+    // Check the length of the directory to determine if it ends with a slash.
     size_t len = strlen(directory);
+    // If the directory is not empty and does not end with a slash, append one.
     if (len > 0 && directory[len - 1] != '/') {
+        // Use snprintf to safely concatenate directory, a slash, and filename within buffer limits.
         snprintf(full_path, max_size, "%s/%s", directory, filename);
     } else {
+        // If the directory already ends with a slash, concatenate without adding another slash.
         snprintf(full_path, max_size, "%s%s", directory, filename);
     }
+
+    // Manually ensure the last character in the buffer is '\0' to prevent any string overflow issues.
     full_path[max_size - 1] = '\0'; // Ensure null-termination
 }
 
 
 
+
+/**
+ * Sets a default path in the provided path buffer if it is currently empty.
+ * This utility function is typically used to ensure that a path variable is never
+ * empty, assigning a default directory path if no path has been set.
+ *
+ * @param path A mutable buffer containing the current path which may be empty.
+ *             If it is empty, the function fills this buffer with the default path.
+ * @param default_path The default path to set if the current path buffer is empty.
+ *                     This should be a null-terminated string and not NULL.
+ */
 void set_default_path(char* path, const char* default_path) {
+    // Check if the first character of the path is the null character, indicating an empty string.
     if (path[0] == '\0') {
+        // If the path is empty, copy the default path into the buffer.
         strcpy(path, default_path);
     }
+    // If the path is not empty, no action is taken, and the original path remains unchanged.
 }
 
 
@@ -579,39 +492,70 @@ void set_default_path(char* path, const char* default_path) {
 
 
 
-//first two blocks reserved for this function
+/**
+ * Saves the file system entries to a designated area in flash memory.
+ * This function is tasked with serializing the `fileSystem` array and writing it
+ * to a fixed address in flash memory, ensuring that file system entries are
+ * persisted across power cycles or reboots.
+ */
 void saveFileEntriesToFileSystem() {
-    uint32_t address = 262144; 
+    // Address in flash memory where the file system entries are to be stored.
+    // This is set to 262144, assuming this address space is reserved for this purpose.
+    uint32_t address = 262144;
     printf("Saving file entries to flash memory...\n");
-    uint8_t *serializedData = malloc(sizeof(fileSystem));  // Assuming fileSystem can be directly serialized
-    memcpy(serializedData, fileSystem, sizeof(fileSystem)); // Simulate serialization if needed
 
-    flash_write_safe2(address, serializedData, sizeof(fileSystem));
+    // Allocate memory for serialization of the file system entries.
+    // This assumes the `fileSystem` structure can be serialized directly.
+    uint8_t *serializedData = malloc(sizeof(fileSystem));
+    if (serializedData == NULL) {
+        printf("Failed to allocate memory for file system serialization.\n");
+        return; // Early return if memory allocation fails
+    }
 
+    // Copy the file system data into the allocated buffer.
+    // This simulates serialization if the data structure allows direct binary copying.
+    memcpy(serializedData, fileSystem, sizeof(fileSystem));
+
+    // Write the serialized data to flash memory at the specified address.
+    // `flash_write_safe` should ensure that the write operation handles any necessary precautions
+    // like erasing the flash sector before writing.
+    flash_write_safe(address, serializedData, sizeof(fileSystem));
+
+    // Free the allocated memory after the write operation is complete to avoid memory leaks.
     free(serializedData);
     printf("File entries saved to flash memory.\n");
 }
 
 
-// Function to load file entries from flash memory into a local array
+
+/**
+ * Loads file entries from a specific address in flash memory into a local array.
+ * This function reads the serialized data representing file system entries from flash
+ * memory and populates a local array with this data. It can be used during system
+ * initialization to restore the state of the file system from persistent storage.
+ */
 void loadFileEntriesFromFileSystem() {
-    uint32_t address = 262144; 
-    // Local array to hold the recovered file entries
+    // Address in flash memory where the file system entries are stored.
+    uint32_t address = 262144;
+
+    // Local array to hold the file entries recovered from flash memory.
+    // This ensures that the file system can be restored to its last known state.
     FileEntry recoveredFileSystem[MAX_FILES];
 
-    // Read data from flash into the local array
-    flash_read_safe2(address, (uint8_t*)recoveredFileSystem, sizeof(recoveredFileSystem));
+    // Read the data from flash memory into the local array.
+    // This assumes the data at the specified address is a valid serialized array of FileEntry structures.
+    flash_read_safe(address, (uint8_t*)recoveredFileSystem, sizeof(recoveredFileSystem));
 
-    // Optionally, print out the entries to verify correctness
+    // Optionally, iterate over the loaded file entries to verify the integrity and correctness of the data.
     for (int i = 0; i < MAX_FILES; i++) {
+        // Print each recovered file entry's name to verify that data has been loaded correctly.
+        // This is helpful for debugging and ensuring that the load operation was successful.
         printf("Recovered File Entry %d: %s\n", i, recoveredFileSystem[i].filename);
     }
 
-    // Here you can add logic to process the loaded data if needed
+    // Additional logic can be implemented here to further process or integrate the loaded data
+    // into the running application, depending on system requirements.
 }
-
-
-
 
 
 
